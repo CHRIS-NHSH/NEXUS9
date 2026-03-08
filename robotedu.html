@@ -1,0 +1,2825 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS-9 // 機器人解構教學</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+TC:wght@300;400;500;700&family=Exo+2:wght@200;300;600&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#03060e; --panel:#080f1e; --steel:#2a4a68;
+  --chrome:#6090b0; --light:#a8cce0; --white:#ddeeff;
+  --c1:#00d4ff; --c2:#0090cc; --warm:#ff8c42; --green:#00f080;
+  --head-color:#00d4ff; --chest-color:#00f080;
+  --arm-color:#ff8c42;  --leg-color:#b060ff;
+  --sys-color:#ffd060;
+}
+
+html{height:100%;background:var(--bg)}
+body{
+  min-height:100%;font-family:'Noto Sans TC',sans-serif;cursor:none;
+  background:var(--bg);color:var(--white);
+  display:flex;flex-direction:column;
+  overflow-x:hidden; overflow-y:auto;
+}
+
+/* ── CURSOR ── */
+#cur{position:fixed;width:18px;height:18px;border:1px solid var(--c1);border-radius:50%;pointer-events:none;z-index:9999;transform:translate(-50%,-50%);box-shadow:0 0 8px var(--c1);transition:all .08s;top:0;left:0}
+#cur::after{content:'';position:absolute;top:50%;left:50%;width:3px;height:3px;background:var(--c1);border-radius:50%;transform:translate(-50%,-50%)}
+body:active #cur{width:12px;height:12px;border-color:var(--warm)}
+
+/* ── BG CANVAS ── */
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.45}
+
+/* ── SCANLINES ── */
+#scanlines{position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,180,220,.012) 2px,rgba(0,180,220,.012) 3px)}
+
+/* ── NAV ── */
+#nav{
+  position:sticky;top:0;z-index:100;flex-shrink:0;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+  padding:12px 24px;
+  background:rgba(3,6,14,.95);
+  border-bottom:1px solid rgba(0,212,255,.12);
+  backdrop-filter:blur(12px);
+}
+.nav-logo{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;color:var(--white);letter-spacing:3px}
+.nav-logo span{color:var(--c1)}
+.nav-tags{display:flex;gap:6px;flex-wrap:wrap}
+.nav-tag{font-family:'Exo 2',sans-serif;font-size:9px;letter-spacing:1.5px;padding:3px 10px;border-radius:20px;border:1px solid rgba(0,212,255,.2);color:var(--chrome);cursor:none;transition:all .25s}
+.nav-tag:hover{background:rgba(0,212,255,.08);border-color:var(--c1);color:var(--c1)}
+#wx-nav{display:flex;align-items:center;gap:6px;font-family:'Orbitron',sans-serif}
+#wx-nav-temp{font-size:18px;font-weight:900;color:var(--white);text-shadow:0 0 12px rgba(0,212,255,.5)}
+#wx-nav-info{display:flex;flex-direction:column;gap:1px}
+#wx-nav-city{font-size:9px;color:var(--c1);letter-spacing:1px}
+#wx-nav-desc{font-size:8px;color:var(--chrome)}
+
+/* ── HERO: robot + side cards ── */
+#hero{
+  position:relative;z-index:10;
+  display:flex;align-items:flex-start;justify-content:center;
+  gap:0;
+  padding:20px 16px 0;
+  flex-wrap:nowrap;
+}
+
+/* ── LEFT CARDS ── */
+#left-cards{
+  display:flex;flex-direction:column;gap:10px;
+  width:240px;flex-shrink:0;padding-top:30px;
+}
+
+/* ── CENTER (robot) ── */
+#robot-center{
+  display:flex;flex-direction:column;align-items:center;
+  flex-shrink:0;position:relative;
+  padding:0 12px;
+}
+#bubble{
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1.5px;
+  padding:7px 14px;border-radius:10px 10px 10px 2px;
+  background:rgba(6,12,24,.96);border:1px solid rgba(0,212,255,.4);
+  color:var(--c1);white-space:nowrap;
+  box-shadow:0 0 20px rgba(0,212,255,.15);
+  opacity:0;transform:scale(0);transform-origin:bottom left;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .25s;
+  margin-bottom:10px;align-self:flex-start;margin-left:20px;
+  position:relative;
+}
+#bubble::after{content:'';position:absolute;bottom:-6px;left:12px;border:6px solid transparent;border-top-color:rgba(0,212,255,.4);border-bottom:0}
+#bubble.on{opacity:1;transform:scale(1)}
+
+#rw{
+  position:relative;cursor:none;
+  animation:bob 4.5s ease-in-out infinite;
+}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* Robot SVG — scales to available space */
+#R{
+  width:min(260px, 42vw);
+  height:auto;
+  display:block;
+  overflow:visible;
+  filter:drop-shadow(0 0 40px rgba(0,212,255,.15)) drop-shadow(0 20px 60px rgba(0,0,0,.9));
+}
+
+#explode-btn{
+  margin-top:14px;
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;
+  padding:8px 20px;border-radius:20px;
+  border:1px solid var(--c1);color:var(--c1);
+  background:rgba(0,212,255,.05);cursor:none;
+  transition:all .3s;
+}
+#explode-btn:hover{background:rgba(0,212,255,.12);box-shadow:0 0 18px rgba(0,212,255,.2)}
+
+/* ── RIGHT CARDS ── */
+#right-cards{
+  display:flex;flex-direction:column;gap:10px;
+  width:240px;flex-shrink:0;padding-top:30px;
+}
+
+/* ── PART MINI CARDS ── */
+.part-card{
+  background:rgba(8,15,30,.88);
+  border:1px solid rgba(255,255,255,.07);border-radius:13px;
+  padding:12px 14px;cursor:none;
+  transition:all .35s cubic-bezier(.23,1,.32,1);
+  position:relative;overflow:hidden;
+}
+.part-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;background:var(--part-color,var(--c1))}
+.part-card:hover{transform:translateX(5px);border-color:rgba(255,255,255,.12)}
+.part-card.active{transform:translateX(6px);border-color:var(--part-color,var(--c1));background:rgba(10,20,38,.98)}
+.pc-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.pc-icon{font-size:20px}
+.pc-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--white);letter-spacing:.5px}
+.pc-sub{font-size:9px;color:var(--part-color,var(--c1));letter-spacing:1.5px;opacity:.75}
+.pc-desc{font-size:11px;color:var(--chrome);line-height:1.55;margin-top:4px}
+.pc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.pc-tag{font-size:8px;letter-spacing:.5px;padding:2px 7px;border-radius:9px;border:1px solid;opacity:.65;color:var(--part-color,var(--c1));border-color:var(--part-color,var(--c1))}
+
+/* ── DETAIL SECTION ── */
+#detail-zone{
+  position:relative;z-index:10;
+  padding:20px 24px 40px;
+  max-width:1100px;margin:0 auto;width:100%;
+}
+#detail-placeholder{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 0;gap:12px;opacity:.3;
+  font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:3px;color:var(--chrome);text-align:center;
+}
+#detail-placeholder .bi{font-size:40px;opacity:.4}
+
+.detail-panel{display:none}
+.detail-panel.active{display:block;animation:fadeUp .4s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+/* panel header */
+.dp-header{
+  background:rgba(8,15,30,.9);border:1px solid rgba(255,255,255,.07);
+  border-top:3px solid var(--part-color,var(--c1));
+  border-radius:0 0 14px 14px;padding:20px 24px;margin-bottom:20px;
+}
+.dp-icon-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.dp-icon{font-size:32px}
+.dp-title{font-family:'Orbitron',sans-serif;font-size:20px;font-weight:900;color:var(--white)}
+.dp-en{font-size:9px;letter-spacing:4px;color:var(--part-color);opacity:.7;margin-top:2px}
+.dp-tagline{font-size:13px;color:var(--chrome);line-height:1.7}
+
+/* section */
+.dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.dp-col{display:flex;flex-direction:column;gap:14px}
+.dp-section-title{
+  font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;
+  color:var(--part-color,var(--c1));margin-bottom:9px;
+  display:flex;align-items:center;gap:7px;
+  padding-left:8px;border-left:2px solid var(--part-color,var(--c1));
+}
+.dp-box{background:rgba(8,15,30,.9);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:16px}
+
+/* fn list */
+.fn-list{display:flex;flex-direction:column;gap:8px}
+.fn-item{background:rgba(255,255,255,.025);border-left:3px solid var(--part-color,var(--c1));border-radius:0 8px 8px 0;padding:9px 11px}
+.fn-item strong{display:block;font-size:12px;color:var(--white);margin-bottom:2px}
+.fn-item span{font-size:11px;color:var(--chrome);line-height:1.55}
+
+/* dept grid */
+.dept-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.dept-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:9px;padding:9px 11px;cursor:none;transition:all .2s}
+.dept-card:hover{background:rgba(255,255,255,.07)}
+.dept-card.core{border-color:var(--part-color,var(--c1));background:rgba(255,255,255,.05)}
+.dept-card.core .dept-name::after{content:' ★';font-size:9px;opacity:.6}
+.dept-name{font-size:12px;font-weight:700;color:var(--white);margin-bottom:2px}
+.dept-univ{font-size:9px;color:var(--part-color,var(--c1));opacity:.8;margin-bottom:3px}
+.dept-desc{font-size:10px;color:var(--chrome);line-height:1.45}
+/* related dept section label */
+.dept-related-label{
+  font-family:'Exo 2',sans-serif;font-size:9px;letter-spacing:2px;
+  color:var(--chrome);opacity:.55;margin:10px 0 6px;
+  display:flex;align-items:center;gap:6px;
+}
+.dept-related-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+
+/* career */
+.career-list{display:flex;flex-direction:column;gap:6px}
+.career-item{display:flex;align-items:flex-start;gap:9px;background:rgba(255,255,255,.02);border-radius:8px;padding:8px 10px;border:1px solid rgba(255,255,255,.04)}
+.career-dot{width:7px;height:7px;border-radius:50%;background:var(--part-color);flex-shrink:0;margin-top:3px;box-shadow:0 0 5px var(--part-color)}
+.career-info strong{display:block;font-size:12px;color:var(--white)}
+.career-info span{font-size:10px;color:var(--chrome)}
+
+/* industry pills */
+.industry-wrap{display:flex;flex-wrap:wrap;gap:7px}
+.ind-pill{padding:5px 12px;border-radius:18px;font-size:11px;border:1px solid var(--part-color,var(--c1));color:var(--part-color,var(--c1));background:rgba(0,0,0,.25);display:flex;align-items:center;gap:4px;cursor:none;transition:all .2s}
+.ind-pill:hover{background:rgba(255,255,255,.06)}
+.ind-pill small{font-size:9px;opacity:.65}
+
+/* resource links */
+.res-list{display:flex;flex-direction:column;gap:6px}
+.res-link{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05);border-radius:8px;padding:8px 11px;text-decoration:none;color:inherit;cursor:pointer;transition:all .2s}
+.res-link:hover{background:rgba(255,255,255,.07);border-color:var(--part-color,var(--c1))}
+.res-icon{font-size:16px;width:22px;text-align:center}
+.res-info strong{display:block;font-size:11px;color:var(--white)}
+.res-info span{font-size:10px;color:var(--chrome)}
+.res-arrow{margin-left:auto;color:var(--part-color);opacity:.6;font-size:13px}
+
+/* ── STATUS BAR ── */
+#statusbar{
+  position:sticky;bottom:0;z-index:100;
+  height:24px;background:rgba(3,6,14,.96);
+  border-top:1px solid rgba(0,212,255,.08);
+  display:flex;align-items:center;justify-content:center;gap:36px;
+  flex-shrink:0;
+}
+.sb-item{font-family:'Exo 2',sans-serif;font-size:9px;letter-spacing:2px;color:var(--steel);display:flex;align-items:center;gap:5px}
+.sb-dot{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
+/* robot parts */
+.robot-part{cursor:none;transition:filter .3s,opacity .4s}
+.robot-part:hover{filter:brightness(1.4)}
+.robot-part.dimmed{opacity:.22}
+.robot-part.lit{opacity:1;filter:brightness(1.5)}
+
+/* exploded transforms */
+#p-head{transition:transform .75s cubic-bezier(.23,1,.32,1)}
+#p-chest{transition:transform .75s cubic-bezier(.23,1,.32,1) .04s}
+#p-arm-l{transition:transform .75s cubic-bezier(.23,1,.32,1) .08s}
+#p-arm-r{transition:transform .75s cubic-bezier(.23,1,.32,1) .08s}
+#p-legs{transition:transform .75s cubic-bezier(.23,1,.32,1) .12s}
+.exploded #p-head{transform:translateY(-48px)}
+.exploded #p-chest{transform:scale(1.02)}
+.exploded #p-arm-l{transform:translateX(-46px)}
+.exploded #p-arm-r{transform:translateX(46px)}
+.exploded #p-legs{transform:translateY(48px)}
+
+/* connector lines */
+#conn{opacity:0;transition:opacity .5s .3s}
+.exploded #conn{opacity:1}
+
+/* ripple */
+.rip{position:fixed;border-radius:50%;border:1.5px solid var(--warm);width:6px;height:6px;transform:translate(-50%,-50%);animation:ro .6s ease-out forwards;pointer-events:none;z-index:500}
+@keyframes ro{to{width:80px;height:80px;opacity:0}}
+
+/* responsive */
+@media(max-width:900px){
+  #hero{flex-wrap:wrap;justify-content:center}
+  #left-cards,#right-cards{width:100%;flex-direction:row;flex-wrap:wrap;padding-top:0}
+  .part-card{flex:1;min-width:180px}
+  #robot-center{order:-1;width:100%}
+  #R{width:min(220px,55vw)}
+  .dp-grid{grid-template-columns:1fr}
+}
+
+/* ── PAGE SWITCHING ── */
+#page-btns{display:flex;gap:4px}
+.pg-btn{
+  font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;
+  padding:5px 14px;border-radius:16px;cursor:none;
+  border:1px solid rgba(0,212,255,.2);color:var(--chrome);
+  background:transparent;transition:all .25s;
+}
+.pg-btn:hover{border-color:var(--c1);color:var(--c1);background:rgba(0,212,255,.07)}
+.pg-btn.active{border-color:var(--c1);color:var(--bg);background:var(--c1);box-shadow:0 0 14px rgba(0,212,255,.35)}
+
+/* ── PAGES ── */
+.page{display:none}
+.page.active{display:flex;flex-direction:column}
+
+/* ── CULTURE BANNER ── */
+#culture-banner{
+  background:rgba(4,8,18,.95);
+  border-bottom:1px solid rgba(255,140,66,.25);
+  flex-shrink:0;
+}
+#cb-toggle{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 20px;cursor:pointer;
+  font-size:11px;color:var(--chrome);letter-spacing:.5px;
+  user-select:none;transition:color .2s;
+}
+#cb-toggle:hover{color:var(--white)}
+#cb-toggle em{font-style:normal;color:#ff8c42}
+#cb-toggle-icon{font-size:9px;transition:transform .3s;color:#ff8c42}
+#cb-toggle-hint{margin-left:auto;font-size:9px;opacity:.4}
+#culture-banner.open #cb-toggle-icon{transform:rotate(180deg)}
+#cb-body{display:none;padding:16px 20px 20px}
+#culture-banner.open #cb-body{display:block}
+.cb-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:800px){.cb-grid{grid-template-columns:1fr}}
+.cb-card{
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.07);
+  border-top:3px solid var(--cc,#ff8c42);
+  border-radius:10px;padding:16px;
+}
+.cb-year{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;color:var(--cc,#ff8c42);margin-bottom:6px}
+.cb-icon{font-size:24px;margin-bottom:8px}
+.cb-title{font-size:13px;font-weight:700;color:var(--white);margin-bottom:3px}
+.cb-who{font-size:10px;color:var(--chrome);margin-bottom:10px;font-style:italic}
+.cb-desc{font-size:11px;color:var(--light);line-height:1.7;margin-bottom:10px}
+.cb-desc strong{color:var(--cc,#ff8c42)}
+.cb-note{font-size:10px;color:var(--chrome);background:rgba(255,255,255,.04);padding:7px 10px;border-radius:6px;line-height:1.6}
+
+/* ── CIVILISATION PAGE ── */
+#pg-civ{overflow-y:auto;padding:0 0 80px}
+
+.civ-hero{
+  padding:36px 28px 24px;text-align:center;
+  background:linear-gradient(180deg,rgba(0,12,28,.95) 0%,transparent 100%);
+  position:relative;overflow:hidden;
+}
+.civ-hero::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 20% 50%,rgba(255,140,66,.06) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 50%,rgba(0,212,255,.05) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 40% at 80% 50%,rgba(176,96,255,.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+.civ-hero h1{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;color:var(--white);letter-spacing:3px;margin-bottom:10px;position:relative}
+.civ-hero h1 em{font-style:normal;color:#ffd060}
+.civ-hero p{color:var(--chrome);font-size:12px;line-height:1.75;max-width:580px;margin:0 auto;position:relative}
+
+/* convergence diagram — 2×2 + centre */
+.civ-converge{
+  max-width:700px;margin:28px auto 0;padding:0 24px;
+  display:grid;
+  grid-template-areas:
+    "tl . tr"
+    " . ct . "
+    "bl . br";
+  grid-template-columns:1fr 90px 1fr;
+  grid-template-rows:auto 90px auto;
+  gap:0;
+  align-items:center;justify-items:center;
+}
+.civ-stream{
+  width:100%;
+  background:rgba(8,15,30,.85);
+  border:1px solid rgba(255,255,255,.07);
+  border-top:3px solid var(--sc);
+  border-radius:12px;padding:14px 12px;
+  cursor:pointer;
+  transition:transform .25s,border-color .25s,box-shadow .25s;
+}
+.civ-stream:hover{transform:scale(1.03);box-shadow:0 12px 36px rgba(0,0,0,.5);border-color:var(--sc)}
+.civ-stream.pos-tl{grid-area:tl}
+.civ-stream.pos-tr{grid-area:tr}
+.civ-stream.pos-bl{grid-area:bl}
+.civ-stream.pos-br{grid-area:br}
+.civ-stream-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.civ-stream-icon{font-size:18px;flex-shrink:0}
+.civ-stream-label{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:1.5px;color:var(--sc);line-height:1.3}
+.civ-stream-nodes{display:flex;flex-direction:column;gap:4px}
+.civ-node-pill{
+  font-size:9px;padding:2px 7px;border-radius:5px;
+  background:rgba(255,255,255,.04);color:var(--chrome);
+  border-left:2px solid var(--sc);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:background .2s,color .2s;
+}
+.civ-stream:hover .civ-node-pill{background:rgba(255,255,255,.08);color:var(--light)}
+
+/* centre convergence node */
+.civ-centre{
+  grid-area:ct;
+  position:relative;
+  width:90px;height:90px;
+  display:flex;align-items:center;justify-content:center;
+  z-index:2;
+}
+.civ-centre-ring{
+  position:absolute;inset:0;border-radius:50%;
+  background:rgba(255,208,96,.08);
+  border:2px solid rgba(255,208,96,.5);
+  animation:ringPulse 2.4s ease-in-out infinite;
+}
+.civ-centre-ring2{
+  position:absolute;inset:-8px;border-radius:50%;
+  border:1px solid rgba(255,208,96,.2);
+  animation:ringPulse 2.4s ease-in-out infinite .6s;
+}
+@keyframes ringPulse{
+  0%,100%{opacity:.6;transform:scale(1)}
+  50%{opacity:1;transform:scale(1.06)}
+}
+.civ-centre-inner{
+  position:relative;z-index:1;text-align:center;
+}
+.civ-centre-icon{font-size:26px;display:block;line-height:1}
+.civ-centre-label{font-family:'Orbitron',sans-serif;font-size:6.5px;letter-spacing:1px;color:#ffd060;margin-top:4px;line-height:1.4}
+
+/* SVG connector lines */
+.civ-connectors{
+  position:absolute;inset:0;pointer-events:none;overflow:visible;
+}
+
+/* arrow lines wrapper — positioned relative to grid */
+.civ-converge-wrap{
+  max-width:700px;margin:28px auto 0;padding:0 24px;
+  position:relative;
+}
+.civ-converge-wrap .civ-converge{margin:0;padding:0}
+@media(max-width:560px){
+  .civ-converge{
+    grid-template-columns:1fr 64px 1fr;
+    grid-template-rows:auto 64px auto;
+  }
+  .civ-centre{width:64px;height:64px}
+  .civ-centre-icon{font-size:20px}
+  .civ-centre-label{font-size:5.5px}
+  .civ-stream-nodes{display:none}
+  .civ-stream-top{margin-bottom:0}
+}
+
+/* sub-tab nav */
+.civ-tabs{
+  display:flex;gap:6px;padding:20px 24px 0;
+  max-width:960px;margin:0 auto;
+  flex-wrap:wrap;
+}
+.civ-tab{
+  font-size:10px;padding:6px 14px;border-radius:20px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.1);color:var(--chrome);
+  background:transparent;transition:all .2s;letter-spacing:.5px;
+}
+.civ-tab:hover{border-color:var(--tc,#fff);color:var(--tc,#fff)}
+.civ-tab.active{background:var(--tc,#fff);color:#000;border-color:var(--tc,#fff)}
+
+/* sub-page panels */
+.civ-panel{display:none;max-width:960px;margin:0 auto;padding:20px 24px 0}
+.civ-panel.active{display:block}
+
+/* timeline within panel */
+.civ-tl{position:relative;padding-left:28px}
+.civ-tl::before{
+  content:'';position:absolute;left:8px;top:8px;bottom:8px;
+  width:2px;background:linear-gradient(180deg,var(--tc,#fff) 0%,rgba(255,255,255,.1) 100%);
+  border-radius:2px;
+}
+.civ-tl-item{position:relative;margin-bottom:24px}
+.civ-tl-dot{
+  position:absolute;left:-24px;top:4px;
+  width:12px;height:12px;border-radius:50%;
+  background:var(--tc,#fff);
+  box-shadow:0 0 8px var(--tc,#fff);
+  flex-shrink:0;
+}
+.civ-tl-year{font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:2px;color:var(--tc,#fff);margin-bottom:4px}
+.civ-tl-title{font-size:13px;font-weight:700;color:var(--white);margin-bottom:4px}
+.civ-tl-who{font-size:10px;color:var(--chrome);margin-bottom:8px;font-style:italic}
+.civ-tl-desc{font-size:11.5px;color:var(--light);line-height:1.7}
+.civ-tl-desc strong{color:var(--tc,#fff)}
+.civ-tl-impact{
+  display:inline-block;margin-top:8px;
+  font-size:9.5px;padding:3px 10px;border-radius:8px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+  color:var(--chrome);
+}
+.civ-tl-impact em{font-style:normal;color:var(--tc,#fff)}
+.page.active{display:flex;flex-direction:column}
+
+/* ── HISTORY PAGE ── */
+#pg-history{overflow-y:auto;padding:0 0 80px}
+.pg-hero{
+  padding:36px 24px 28px;text-align:center;
+  background:linear-gradient(180deg,rgba(0,28,48,.7) 0%,transparent 100%);
+}
+.pg-hero h1{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;
+  color:var(--white);letter-spacing:3px;margin-bottom:8px}
+.pg-hero h1 em{font-style:normal;color:var(--c1)}
+.pg-hero p{color:var(--chrome);font-size:12px;line-height:1.7;max-width:540px;margin:0 auto}
+
+/* single-column accordion timeline */
+#tl{
+  max-width:640px;margin:0 auto;
+  padding:8px 24px 20px;
+  position:relative;
+}
+#tl::before{
+  content:'';position:absolute;
+  left:44px;top:0;bottom:0;width:2px;
+  background:linear-gradient(180deg,transparent,rgba(0,212,255,.2) 5%,rgba(0,212,255,.2) 95%,transparent);
+  pointer-events:none;
+}
+
+.tl-era{
+  display:flex;align-items:flex-start;
+  gap:0;margin-bottom:0;
+  position:relative;
+  cursor:none;
+}
+
+/* dot + connector column */
+.tl-axis{
+  display:flex;flex-direction:column;align-items:center;
+  width:44px;flex-shrink:0;
+  padding-top:20px;
+  position:relative;z-index:2;
+}
+.tl-dot{
+  width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--ec,#00d4ff);
+  background:var(--bg);
+  box-shadow:0 0 8px var(--ec,#00d4ff);
+  transition:all .3s;flex-shrink:0;
+}
+.tl-era:hover .tl-dot,.tl-era.open .tl-dot{
+  background:var(--ec,#00d4ff);
+  box-shadow:0 0 20px var(--ec,#00d4ff);
+  transform:scale(1.3);
+}
+.tl-axis::after{
+  content:'';width:2px;
+  flex:1;min-height:28px;margin-top:8px;
+  background:var(--ec,rgba(0,212,255,.3));opacity:.35;
+}
+.tl-era:last-child .tl-axis::after{display:none}
+
+/* the card */
+.tl-body{flex:1;padding:12px 0 28px 0}
+
+.tl-header{
+  background:rgba(8,15,30,.9);
+  border:1px solid rgba(255,255,255,.06);
+  border-left:3px solid var(--ec,#00d4ff);
+  border-radius:0 10px 10px 0;
+  padding:13px 16px;
+  transition:border-color .25s,box-shadow .25s;
+}
+.tl-era:hover .tl-header,.tl-era.open .tl-header{
+  border-color:var(--ec,#00d4ff);
+  box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+
+.tl-year{
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:2px;
+  color:var(--ec,#00d4ff);margin-bottom:3px;opacity:.85;
+}
+.tl-title{font-size:13px;font-weight:700;color:var(--white);line-height:1.35}
+.tl-tag{
+  display:inline-block;margin-top:6px;
+  font-size:9px;padding:2px 8px;border-radius:8px;
+  border:1px solid var(--ec,#00d4ff);color:var(--ec,#00d4ff);opacity:.5;
+  letter-spacing:.5px;
+}
+.tl-hint{
+  font-size:10px;color:var(--chrome);opacity:.4;
+  margin-top:5px;
+}
+.tl-era:hover .tl-hint{opacity:.75;color:var(--ec,#00d4ff)}
+.tl-era.open .tl-hint{display:none}
+
+/* expand */
+.tl-expand{
+  display:none;
+  margin-top:10px;
+  padding:0 2px;
+}
+.tl-era.open .tl-expand{display:block;animation:fadeUp .3s ease}
+
+/* era image */
+.tl-img{
+  width:100%;height:180px;
+  object-fit:cover;border-radius:8px;
+  margin-bottom:12px;
+  border:1px solid rgba(255,255,255,.08);
+  filter:brightness(.85) saturate(.9);
+  transition:filter .3s;
+  display:block;
+}
+.tl-img:hover{filter:brightness(1) saturate(1.1)}
+.tl-img-caption{
+  font-size:9px;color:var(--chrome);opacity:.5;
+  margin-top:-8px;margin-bottom:12px;
+  letter-spacing:.5px;text-align:right;
+}
+
+.tl-ms{
+  margin-bottom:7px;
+  padding:9px 12px;
+  background:rgba(255,255,255,.025);
+  border-left:2px solid var(--ec,#00d4ff);
+  border-radius:0 7px 7px 0;
+}
+.tl-ms strong{display:block;font-size:11px;color:var(--white);margin-bottom:2px}
+.tl-ms span{font-size:11px;color:var(--chrome);line-height:1.55}
+
+.tl-insight{
+  margin-top:10px;padding:11px 13px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--ec,#00d4ff);
+  border-radius:8px;
+}
+.tl-insight-lbl{
+  font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:2px;
+  color:var(--ec,#00d4ff);margin-bottom:5px;opacity:.8;
+}
+.tl-insight p{font-size:11px;color:var(--light);line-height:1.6;margin:0}
+
+/* ── APPS PAGE ── */
+#pg-apps{overflow-y:auto;padding:0 0 80px}
+
+.apps-hero{
+  padding:36px 28px 24px;text-align:center;
+  background:linear-gradient(180deg,rgba(0,18,36,.8) 0%,transparent 100%);
+  position:relative;overflow:hidden;
+}
+.apps-hero::before{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    90deg,transparent,transparent 60px,rgba(0,212,255,.02) 60px,rgba(0,212,255,.02) 61px
+  ),repeating-linear-gradient(
+    0deg,transparent,transparent 60px,rgba(0,212,255,.02) 60px,rgba(0,212,255,.02) 61px
+  );
+  pointer-events:none;
+}
+.apps-hero h1{
+  font-family:'Orbitron',sans-serif;font-size:24px;font-weight:900;
+  color:var(--white);letter-spacing:3px;margin-bottom:10px;position:relative;
+}
+.apps-hero h1 em{font-style:normal;color:#ff6b35}
+.apps-hero p{color:var(--chrome);font-size:12px;line-height:1.75;max-width:560px;margin:0 auto;position:relative}
+
+/* counter strip */
+.apps-counter{
+  display:flex;justify-content:center;gap:32px;
+  padding:16px 0 4px;
+}
+.apps-counter-item{text-align:center}
+.apps-counter-num{
+  font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;
+  color:#ff6b35;display:block;line-height:1;
+}
+.apps-counter-lbl{font-size:9px;color:var(--chrome);letter-spacing:2px;margin-top:3px}
+
+/* grid */
+.apps-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:16px;
+  max-width:960px;margin:20px auto 0;
+  padding:0 24px;
+}
+@media(max-width:700px){.apps-grid{grid-template-columns:1fr}}
+
+/* app card */
+.app-card{
+  background:rgba(8,15,30,.9);
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:14px;
+  padding:0;overflow:hidden;
+  cursor:none;
+  transition:transform .3s, box-shadow .3s, border-color .3s;
+  position:relative;
+}
+.app-card:hover{
+  transform:translateY(-4px);
+  box-shadow:0 16px 48px rgba(0,0,0,.6);
+  border-color:rgba(255,255,255,.14);
+}
+.app-card-top{
+  height:5px;
+  background:var(--ac,#ff6b35);
+}
+.app-card-body{padding:18px 20px 16px}
+
+.app-rank{
+  font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;
+  color:var(--ac,#ff6b35);opacity:.7;margin-bottom:6px;
+}
+.app-icon-title{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.app-icon-wrap{
+  width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--ac,#ff6b35);
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
+.app-title{font-size:15px;font-weight:700;color:var(--white);line-height:1.2}
+.app-en{font-size:9px;color:var(--chrome);letter-spacing:1px;margin-top:2px}
+
+.app-desc{font-size:11.5px;color:var(--light);line-height:1.65;margin-bottom:14px}
+
+/* maturity bar */
+.app-maturity{display:flex;align-items:center;gap:10px}
+.app-maturity-label{font-size:9px;color:var(--chrome);letter-spacing:1px;white-space:nowrap}
+.app-bar-track{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
+.app-bar-fill{height:100%;border-radius:4px;background:var(--ac,#ff6b35);transition:width 1.2s cubic-bezier(.23,1,.32,1)}
+.app-bar-fill{width:0}  /* start at 0, animated by JS */
+.app-pct{font-family:'Orbitron',sans-serif;font-size:9px;color:var(--ac,#ff6b35);min-width:2.5em;text-align:right}
+
+/* tag pills */
+.app-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.app-tag{
+  font-size:8.5px;padding:2px 8px;border-radius:10px;letter-spacing:.5px;
+  border:1px solid var(--ac,#ff6b35);color:var(--ac,#ff6b35);opacity:.55;
+}
+
+/* companies row */
+.app-companies{
+  display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;
+  padding-top:10px;border-top:1px solid rgba(255,255,255,.05);
+}
+.app-company{
+  font-size:9px;color:var(--chrome);
+  background:rgba(255,255,255,.04);
+  padding:2px 8px;border-radius:6px;letter-spacing:.5px;
+}
+
+/* ── REFS PAGE ── */
+#pg-refs{overflow-y:auto;padding:0 0 80px}
+.refs-hero{
+  padding:36px 28px 20px;
+  background:linear-gradient(180deg,rgba(0,18,36,.85) 0%,transparent 100%);
+}
+.refs-hero h1{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;color:var(--white);letter-spacing:3px;margin-bottom:8px}
+.refs-hero h1 em{font-style:normal;color:var(--c1)}
+.refs-hero p{color:var(--chrome);font-size:11.5px;line-height:1.7;max-width:640px}
+.refs-body{max-width:980px;margin:0 auto;padding:8px 24px 40px}
+.refs-section{margin-bottom:34px}
+.refs-section-title{
+  font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:3px;
+  color:var(--c1);margin-bottom:12px;padding-bottom:8px;
+  border-bottom:1px solid rgba(0,212,255,.18);
+  display:flex;align-items:center;gap:10px;
+}
+.refs-count{
+  background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);
+  padding:1px 9px;border-radius:8px;font-size:9px;color:var(--c1);
+}
+.refs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(430px,1fr));gap:7px}
+@media(max-width:620px){.refs-grid{grid-template-columns:1fr}}
+.ref-card{
+  background:rgba(8,15,30,.75);
+  border:1px solid rgba(255,255,255,.05);
+  border-radius:9px;padding:11px 13px;
+  display:flex;gap:11px;align-items:flex-start;
+  transition:border-color .2s,background .2s;
+  cursor:pointer;
+}
+.ref-card:hover{border-color:rgba(0,212,255,.3);background:rgba(0,212,255,.035)}
+.ref-num{font-family:'Orbitron',sans-serif;font-size:8.5px;color:var(--c1);min-width:26px;padding-top:2px;opacity:.6;flex-shrink:0}
+.ref-title{font-size:11px;font-weight:600;color:var(--white);line-height:1.4;margin-bottom:3px}
+.ref-source{font-size:10px;color:var(--chrome);margin-bottom:4px;font-style:italic}
+.ref-url{font-size:8.5px;color:rgba(0,212,255,.45);word-break:break-all;line-height:1.4}
+.ref-card:hover .ref-url{color:var(--c1)}
+.refs-note{
+  margin:24px 0 0;padding:14px 18px;
+  background:rgba(255,208,96,.04);border:1px solid rgba(255,208,96,.18);
+  border-radius:10px;font-size:11px;color:var(--chrome);line-height:1.75;
+}
+.refs-note strong{color:#ffd060;}
+#pg-future{overflow-y:auto;padding:0 32px 80px;gap:28px}
+.fut-hero{
+  padding:36px 0 20px;text-align:center;
+  background:linear-gradient(180deg,rgba(20,10,0,.7) 0%,transparent 100%);
+  margin:0 -32px 4px;padding-left:32px;padding-right:32px;
+}
+.fut-hero h1{font-family:'Orbitron',sans-serif;font-size:22px;font-weight:900;
+  color:var(--white);letter-spacing:3px;margin-bottom:8px}
+.fut-hero h1 span{color:var(--warm)}
+.fut-hero p{color:var(--chrome);font-size:12px;line-height:1.7;max-width:560px;margin:0 auto}
+
+.fut-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:1100px;margin:0 auto}
+@media(max-width:900px){.fut-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.fut-grid{grid-template-columns:1fr}}
+
+.fut-card{
+  background:rgba(8,15,30,.92);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;padding:20px;
+  position:relative;overflow:hidden;
+  transition:all .3s;cursor:none;
+}
+.fut-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,var(--fc,var(--c1)),transparent);
+}
+.fut-card:hover{transform:translateY(-4px);border-color:rgba(255,255,255,.15);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.fut-icon{font-size:32px;margin-bottom:12px}
+.fut-horizon{
+  font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:3px;
+  color:var(--fc,var(--c1));margin-bottom:6px;opacity:.8;
+}
+.fut-title{font-size:15px;font-weight:700;color:var(--white);margin-bottom:8px}
+.fut-desc{font-size:12px;color:var(--chrome);line-height:1.65}
+.fut-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.fut-tag{font-size:9px;padding:2px 8px;border-radius:8px;border:1px solid var(--fc,var(--c1));color:var(--fc,var(--c1));opacity:.65}
+
+.fut-horizon-section{width:100%;max-width:1060px;margin:20px auto 0}
+.fut-h-title{
+  font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:3px;
+  color:var(--chrome);margin-bottom:14px;opacity:.7;
+  display:flex;align-items:center;gap:10px;
+}
+.fut-h-title::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+</style>
+</head>
+<body>
+<div id="cur"></div>
+<canvas id="bg"></canvas>
+<div id="scanlines"></div>
+
+<!-- ── NAV ── -->
+<nav id="nav">
+  <div class="nav-logo">NEXUS<span>-9</span> // 機器人解構教學</div>
+  <div id="page-btns">
+    <button class="pg-btn active" onclick="switchPage('robot')">🤖 部件解析</button>
+    <button class="pg-btn" onclick="switchPage('history')">📅 歷史發展</button>
+    <button class="pg-btn" onclick="switchPage('civ')">⚡ 文明交匯</button>
+    <button class="pg-btn" onclick="switchPage('apps')">🌐 現況應用</button>
+    <button class="pg-btn" onclick="switchPage('future')">🚀 未來展望</button>
+    <button class="pg-btn" onclick="switchPage('refs')">📎 參考資料</button>
+  </div>
+  <div id="wx-nav">
+    <span id="wx-nav-icon">☁️</span>
+    <span id="wx-nav-temp">--°C</span>
+    <div id="wx-nav-info">
+      <span id="wx-nav-city">LOCATING</span>
+      <span id="wx-nav-desc">--</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ══ PAGE: ROBOT ══ -->
+<div id="pg-robot" class="page active">
+
+<!-- ── CULTURE BANNER ── -->
+<div id="culture-banner">
+  <div id="cb-toggle" onclick="toggleCultureBanner()">
+    <span id="cb-toggle-icon">▼</span>
+    <span>在開始之前：<em>Robot 這個字從哪裡來？</em></span>
+    <span id="cb-toggle-hint">點擊展開／收合</span>
+  </div>
+  <div id="cb-body">
+    <div class="cb-grid">
+
+      <div class="cb-card" style="--cc:#ff8c42">
+        <div class="cb-year">1920</div>
+        <div class="cb-icon">🎭</div>
+        <div class="cb-title">Robot 一詞的誕生</div>
+        <div class="cb-who">Karel Čapek《R.U.R.》</div>
+        <div class="cb-desc">捷克劇作家 Karel Čapek 在劇本《羅薩姆萬能機器人》中首創「Robot」一詞，源自捷克語 <em>robota</em>（強迫勞動、苦役）。劇情描述人造工人最終起義反抗人類——這個對自動化的焦慮，在一百年後的今天依然是核心議題。</div>
+        <div class="cb-note">💡 有趣的是，Čapek 的機器人是「生化人」而非機械，更接近今天的 AI 概念</div>
+      </div>
+
+      <div class="cb-card" style="--cc:#00d4ff">
+        <div class="cb-year">1942</div>
+        <div class="cb-icon">📜</div>
+        <div class="cb-title">機器人三大定律</div>
+        <div class="cb-who">Isaac Asimov《Runaround》</div>
+        <div class="cb-desc">科幻小說家 Asimov 在短篇《轉圈圈》中提出三大定律：<strong>① 不得傷害人類</strong>、<strong>② 服從人類命令</strong>（除非違反①）、<strong>③ 保護自身存在</strong>（除非違反①②）。Asimov 本人在後續故事中幾乎把每一條定律都用「邊緣案例」推翻——這些思想實驗正是今天機器人倫理學的源頭。</div>
+        <div class="cb-note">🤖 2023 年起，AI 安全研究者正在認真討論如何把類似原則嵌入 LLM</div>
+      </div>
+
+      <div class="cb-card" style="--cc:#b060ff">
+        <div class="cb-year">今天</div>
+        <div class="cb-icon">⚖️</div>
+        <div class="cb-title">這些問題還沒有答案</div>
+        <div class="cb-who">機器人倫理 · AI 安全</div>
+        <div class="cb-desc">機器人傷害人類誰負責？自主武器應該被禁止嗎？機器人有「感受」嗎？Čapek 和 Asimov 提出這些問題的時候，距離人形機器人商業化還有一百年。現在這些問題變得非常真實，而工程師、法學家、哲學家還在爭論答案。</div>
+        <div class="cb-note">📖 推薦延伸：Kate Darling《The New Breed》、Stuart Russell《Human Compatible》</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div id="hero">
+
+  <!-- LEFT: head + chest cards -->
+  <div id="left-cards">
+    <div class="part-card" id="card-head" style="--part-color:var(--head-color)" onclick="sel('head',event)">
+      <div class="pc-top"><span class="pc-icon">🧠</span>
+        <div><div class="pc-title">頭部感測系統</div><div class="pc-sub">SENSOR · VISION · AI</div></div>
+      </div>
+      <div class="pc-desc">整合視覺感測、語音識別與 AI 推理，是機器人的「眼腦」中樞，負責感知周遭環境並即時判斷。</div>
+      <div class="pc-tags"><span class="pc-tag">電腦視覺</span><span class="pc-tag">深度學習</span><span class="pc-tag">LiDAR</span></div>
+    </div>
+    <div class="part-card" id="card-chest" style="--part-color:var(--chest-color)" onclick="sel('chest',event)">
+      <div class="pc-top"><span class="pc-icon">⚡</span>
+        <div><div class="pc-title">胸部核心模組</div><div class="pc-sub">POWER · COMPUTE · OS</div></div>
+      </div>
+      <div class="pc-desc">高效電池組、嵌入式運算主機板與通訊模組整合，驅動全身系統運作的「心臟與大腦」。</div>
+      <div class="pc-tags"><span class="pc-tag">嵌入式系統</span><span class="pc-tag">電力電子</span><span class="pc-tag">ROS 2</span></div>
+    </div>
+  </div>
+
+  <!-- CENTER: robot -->
+  <div id="robot-center">
+    <div id="bubble"></div>
+    <div id="rw">
+      <svg id="R" viewBox="0 0 280 510" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0e2035"/><stop offset="100%" stop-color="#060f1c"/></linearGradient>
+        <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#112236"/><stop offset="100%" stop-color="#06101c"/></linearGradient>
+        <radialGradient id="eR" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00d4ff" stop-opacity=".95"/><stop offset="100%" stop-color="#004060" stop-opacity="0"/></radialGradient>
+        <radialGradient id="cR" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#00d4ff" stop-opacity=".8"/><stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/></radialGradient>
+        <filter id="f1"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="f2"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+
+      <!-- connector lines (shown when exploded) -->
+      <g id="conn">
+        <line x1="140" y1="65" x2="140" y2="115" stroke="rgba(0,212,255,.35)" stroke-width="1" stroke-dasharray="4,3"><animate attributeName="stroke-dashoffset" values="0;-14" dur="1s" repeatCount="indefinite"/></line>
+        <line x1="78" y1="178" x2="48" y2="208" stroke="rgba(255,140,66,.35)" stroke-width="1" stroke-dasharray="4,3"><animate attributeName="stroke-dashoffset" values="0;-14" dur="1s" repeatCount="indefinite"/></line>
+        <line x1="202" y1="178" x2="232" y2="208" stroke="rgba(255,140,66,.35)" stroke-width="1" stroke-dasharray="4,3"><animate attributeName="stroke-dashoffset" values="0;-14" dur="1s" repeatCount="indefinite"/></line>
+        <line x1="140" y1="290" x2="140" y2="312" stroke="rgba(176,96,255,.35)" stroke-width="1" stroke-dasharray="4,3"><animate attributeName="stroke-dashoffset" values="0;-14" dur="1s" repeatCount="indefinite"/></line>
+      </g>
+
+      <!-- SYS INTEGRATION OVERLAY (shown when sys selected) -->
+      <g id="p-sys" style="pointer-events:none;opacity:0;transition:opacity .4s">
+        <!-- ring around entire body -->
+        <rect x="22" y="16" width="236" height="502" rx="18" fill="none" stroke="var(--sys-color)" stroke-width="1.5" stroke-dasharray="6,4" opacity=".5"/>
+        <!-- data flow lines head→chest -->
+        <line x1="140" y1="124" x2="140" y2="158" stroke="var(--sys-color)" stroke-width="2" opacity=".6" stroke-dasharray="5,3"><animate attributeName="stroke-dashoffset" values="0;-16" dur=".8s" repeatCount="indefinite"/></line>
+        <!-- chest→arms -->
+        <line x1="98" y1="200" x2="60" y2="200" stroke="var(--sys-color)" stroke-width="2" opacity=".6" stroke-dasharray="5,3"><animate attributeName="stroke-dashoffset" values="0;-16" dur=".8s" repeatCount="indefinite"/></line>
+        <line x1="182" y1="200" x2="220" y2="200" stroke="var(--sys-color)" stroke-width="2" opacity=".6" stroke-dasharray="5,3"><animate attributeName="stroke-dashoffset" values="0;-16" dur=".8s" repeatCount="indefinite"/></line>
+        <!-- chest→legs -->
+        <line x1="140" y1="292" x2="140" y2="318" stroke="var(--sys-color)" stroke-width="2" opacity=".6" stroke-dasharray="5,3"><animate attributeName="stroke-dashoffset" values="0;-16" dur=".8s" repeatCount="indefinite"/></line>
+        <!-- node dots -->
+        <circle cx="140" cy="141" r="5" fill="none" stroke="var(--sys-color)" stroke-width="1.5" opacity=".8"><animate attributeName="r" values="4;7;4" dur="1.5s" repeatCount="indefinite"/></circle>
+        <circle cx="140" cy="206" r="5" fill="var(--sys-color)" opacity=".4"><animate attributeName="opacity" values=".2;.8;.2" dur="1.2s" repeatCount="indefinite"/></circle>
+        <circle cx="44" cy="200" r="4" fill="var(--sys-color)" opacity=".5"><animate attributeName="opacity" values=".2;.9;.2" dur="1.4s" repeatCount="indefinite"/></circle>
+        <circle cx="236" cy="200" r="4" fill="var(--sys-color)" opacity=".5"><animate attributeName="opacity" values=".2;.9;.2" dur="1.4s" begin=".3s" repeatCount="indefinite"/></circle>
+        <circle cx="140" cy="305" r="4" fill="var(--sys-color)" opacity=".5"><animate attributeName="opacity" values=".2;.9;.2" dur="1.3s" begin=".6s" repeatCount="indefinite"/></circle>
+        <!-- label tags -->
+        <rect x="86" y="134" width="108" height="16" rx="4" fill="rgba(3,6,14,.85)" stroke="var(--sys-color)" stroke-width=".8" opacity=".7"/>
+        <text x="140" y="145" text-anchor="middle" fill="var(--sys-color)" font-size="8" font-family="monospace" opacity=".9">ROS 2 MESSAGE BUS</text>
+        <rect x="52" y="186" width="58" height="14" rx="3" fill="rgba(3,6,14,.85)" stroke="var(--sys-color)" stroke-width=".7" opacity=".6"/>
+        <text x="81" y="196" text-anchor="middle" fill="var(--sys-color)" font-size="7.5" font-family="monospace" opacity=".8">SERVO DRIVER</text>
+        <rect x="170" y="186" width="58" height="14" rx="3" fill="rgba(3,6,14,.85)" stroke="var(--sys-color)" stroke-width=".7" opacity=".6"/>
+        <text x="199" y="196" text-anchor="middle" fill="var(--sys-color)" font-size="7.5" font-family="monospace" opacity=".8">SERVO DRIVER</text>
+        <rect x="96" y="322" width="88" height="14" rx="3" fill="rgba(3,6,14,.85)" stroke="var(--sys-color)" stroke-width=".7" opacity=".6"/>
+        <text x="140" y="332" text-anchor="middle" fill="var(--sys-color)" font-size="7.5" font-family="monospace" opacity=".8">GAIT CONTROLLER</text>
+      </g>
+
+      <!-- HEAD -->
+      <g id="p-head" class="robot-part" onclick="sel('head',event)">
+        <line x1="140" y1="20" x2="140" y2="4" stroke="#1a3a55" stroke-width="2.5"/>
+        <path d="M135,4 L140,-2 L145,4 Z" fill="#07111e" stroke="#1a3a55" stroke-width="1"/>
+        <rect x="138" y="-2" width="4" height="4" rx="1" fill="var(--warm)"><animate attributeName="opacity" values="1;.1;1" dur="1.6s" repeatCount="indefinite"/></rect>
+        <path d="M82,32 Q78,70 82,107 Q90,120 140,124 Q190,120 198,107 Q202,70 198,32 Q140,16 82,32 Z" fill="url(#g2)" stroke="#0f2438" stroke-width="2"/>
+        <path d="M88,48 Q140,42 192,48 L190,78 Q140,84 90,78 Z" fill="#010408" stroke="#0a1c2c" stroke-width="1.2"/>
+        <path d="M88,48 Q140,42 192,48" fill="none" stroke="var(--head-color)" stroke-width=".8" opacity=".5" filter="url(#f1)"/>
+        <path d="M94,52 Q113,47 127,52 L127,72 Q113,77 94,72 Z" fill="#010508" stroke="#0d2030" stroke-width="1"/>
+        <path d="M153,52 Q167,47 186,52 L186,72 Q167,77 153,72 Z" fill="#010508" stroke="#0d2030" stroke-width="1"/>
+        <path d="M94,52 Q113,47 127,52 L127,72 Q113,77 94,72 Z" fill="url(#eR)" opacity=".55"><animate attributeName="opacity" values=".3;.75;.3" dur="2.5s" repeatCount="indefinite"/></path>
+        <path d="M153,52 Q167,47 186,52 L186,72 Q167,77 153,72 Z" fill="url(#eR)" opacity=".55"><animate attributeName="opacity" values=".3;.75;.3" dur="2.5s" begin=".4s" repeatCount="indefinite"/></path>
+        <ellipse cx="110" cy="62" rx="11" ry="8" fill="none" stroke="var(--head-color)" stroke-width="1.5" filter="url(#f1)" opacity=".8"/>
+        <ellipse cx="168" cy="62" rx="11" ry="8" fill="none" stroke="var(--head-color)" stroke-width="1.5" filter="url(#f1)" opacity=".8"/>
+        <ellipse id="pL" cx="110" cy="62" rx="5" ry="3.5" fill="var(--head-color)" filter="url(#f1)"/>
+        <ellipse id="pR" cx="168" cy="62" rx="5" ry="3.5" fill="var(--head-color)" filter="url(#f1)"/>
+        <circle id="pLs" cx="112" cy="60" r="1.8" fill="white" opacity=".9"/>
+        <circle id="pRs" cx="170" cy="60" r="1.8" fill="white" opacity=".9"/>
+        <path d="M106,84 Q140,91 174,84 L172,100 Q140,107 108,100 Z" fill="#020608" stroke="#091828" stroke-width="1"/>
+        <line x1="113" y1="87" x2="113" y2="102" stroke="#0c1e2e" stroke-width="1.2"/>
+        <line x1="122" y1="85" x2="122" y2="104" stroke="#0c1e2e" stroke-width="1.2"/>
+        <line x1="131" y1="84" x2="131" y2="105" stroke="#0c1e2e" stroke-width="1.2"/>
+        <line x1="140" y1="84" x2="140" y2="105" stroke="#0c1e2e" stroke-width="1.2"/>
+        <line x1="149" y1="84" x2="149" y2="105" stroke="#0c1e2e" stroke-width="1.2"/>
+        <line x1="158" y1="85" x2="158" y2="104" stroke="#0c1e2e" stroke-width="1.2"/>
+        <line x1="167" y1="87" x2="167" y2="102" stroke="#0c1e2e" stroke-width="1.2"/>
+        <path d="M82,32 Q78,70 82,107 Q90,120 140,124 Q190,120 198,107 Q202,70 198,32 Q140,16 82,32 Z" fill="none" stroke="var(--head-color)" stroke-width=".7" opacity=".2" filter="url(#f1)"/>
+        <path d="M76,50 Q68,62 70,90 L82,107 L82,50 Z" fill="#07111e" stroke="#0b1c2c" stroke-width="1"/>
+        <rect x="70" y="58" width="8" height="6" rx="1" fill="#030810"/><rect x="70" y="68" width="8" height="6" rx="1" fill="#030810"/><rect x="70" y="78" width="8" height="6" rx="1" fill="#030810"/>
+        <path d="M198,50 Q208,62 210,90 L198,107 L198,50 Z" fill="#07111e" stroke="#0b1c2c" stroke-width="1"/>
+        <rect x="202" y="58" width="8" height="6" rx="1" fill="#030810"/><rect x="202" y="68" width="8" height="6" rx="1" fill="#030810"/><rect x="202" y="78" width="8" height="6" rx="1" fill="#030810"/>
+        <!-- hover ring -->
+        <path class="hover-ring" d="M80,30 Q77,70 80,108 Q90,123 140,127 Q190,123 200,108 Q203,70 200,30 Q140,14 80,30 Z" fill="none" stroke="var(--head-color)" stroke-width="2" opacity="0" filter="url(#f1)"/>
+      </g>
+
+      <!-- NECK -->
+      <path d="M118,122 L114,158 L166,158 L162,122 Z" fill="#050d18"/>
+      <rect x="116" y="125" width="48" height="7" rx="2.5" fill="#081520"/>
+      <path d="M124,122 Q122,140 122,158" fill="none" stroke="#0c1e2e" stroke-width="2"/>
+      <path d="M140,122 L140,158" fill="none" stroke="#0c1e2e" stroke-width="2"/>
+      <path d="M156,122 Q158,140 158,158" fill="none" stroke="#0c1e2e" stroke-width="2"/>
+
+      <!-- CHEST -->
+      <g id="p-chest" class="robot-part" onclick="sel('chest',event)">
+        <path d="M38,170 Q28,156 40,142 Q60,133 98,138 L106,195 Q62,205 38,170 Z" fill="#07111e" stroke="#0c1e2e" stroke-width="1.5"/>
+        <path d="M40,166 Q32,154 42,143 Q60,136 96,140" fill="none" stroke="var(--chest-color)" stroke-width=".8" opacity=".2"/>
+        <path d="M42,156 Q52,150 62,154" fill="none" stroke="var(--warm)" stroke-width="2" opacity=".5"><animate attributeName="opacity" values=".3;.8;.3" dur="2s" repeatCount="indefinite"/></path>
+        <path d="M242,170 Q252,156 240,142 Q220,133 182,138 L174,195 Q218,205 242,170 Z" fill="#07111e" stroke="#0c1e2e" stroke-width="1.5"/>
+        <path d="M238,156 Q228,150 218,154" fill="none" stroke="var(--warm)" stroke-width="2" opacity=".5"><animate attributeName="opacity" values=".3;.8;.3" dur="2s" begin=".5s" repeatCount="indefinite"/></path>
+        <path d="M98,156 Q94,208 98,292 L182,292 Q186,208 182,156 Q140,144 98,156 Z" fill="url(#g1)" stroke="#0b1c2c" stroke-width="1.5"/>
+        <path d="M100,190 Q140,186 180,190" fill="none" stroke="#09182a" stroke-width="1.5"/>
+        <path d="M100,228 Q140,224 180,228" fill="none" stroke="#09182a" stroke-width="1"/>
+        <!-- arc reactor -->
+        <circle cx="140" cy="206" r="40" fill="#020810" stroke="#0c1e2e" stroke-width="2"/>
+        <circle cx="140" cy="206" r="33" fill="none" stroke="#0d2030" stroke-width="1"/>
+        <circle cx="140" cy="206" r="25" fill="#030912" stroke="var(--chest-color)" stroke-width="1.2" opacity=".45" filter="url(#f1)"><animate attributeName="r" values="23;27;23" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".3;.7;.3" dur="2.4s" repeatCount="indefinite"/></circle>
+        <circle cx="140" cy="206" r="13" fill="url(#cR)"><animate attributeName="r" values="11;16;11" dur="2.4s" repeatCount="indefinite"/></circle>
+        <circle cx="140" cy="206" r="6" fill="var(--chest-color)" filter="url(#f2)"><animate attributeName="r" values="4;8;4" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;1;.6" dur="2.4s" repeatCount="indefinite"/></circle>
+        <circle cx="140" cy="175" r="3" fill="#091828" stroke="var(--chest-color)" stroke-width=".8" opacity=".55"/>
+        <circle cx="140" cy="237" r="3" fill="#091828" stroke="var(--chest-color)" stroke-width=".8" opacity=".55"/>
+        <circle cx="112" cy="191" r="3" fill="#091828" stroke="var(--chest-color)" stroke-width=".8" opacity=".55"/>
+        <circle cx="168" cy="191" r="3" fill="#091828" stroke="var(--chest-color)" stroke-width=".8" opacity=".55"/>
+        <circle cx="112" cy="221" r="3" fill="#091828" stroke="var(--chest-color)" stroke-width=".8" opacity=".55"/>
+        <circle cx="168" cy="221" r="3" fill="#091828" stroke="var(--chest-color)" stroke-width=".8" opacity=".55"/>
+        <!-- EQ bars -->
+        <rect x="106" y="248" width="68" height="34" rx="5" fill="#030810" stroke="#091828" stroke-width="1"/>
+        <rect x="111" y="266" width="7" height="12" rx="1.5" fill="var(--chest-color)" opacity=".7" style="transform-origin:111px 278px"><animateTransform attributeName="transform" type="scale" values="1 1;1 .3;1 .8;1 1" dur="1.1s" repeatCount="indefinite"/></rect>
+        <rect x="121" y="258" width="7" height="20" rx="1.5" fill="var(--chest-color)" opacity=".7" style="transform-origin:121px 278px"><animateTransform attributeName="transform" type="scale" values="1 .6;1 1;1 .3;1 .6" dur="1.3s" repeatCount="indefinite"/></rect>
+        <rect x="131" y="254" width="7" height="24" rx="1.5" fill="var(--chest-color)" opacity=".8" style="transform-origin:131px 278px"><animateTransform attributeName="transform" type="scale" values="1 1;1 .45;1 1;1 1" dur=".95s" repeatCount="indefinite"/></rect>
+        <rect x="141" y="256" width="7" height="22" rx="1.5" fill="var(--chest-color)" opacity=".7" style="transform-origin:141px 278px"><animateTransform attributeName="transform" type="scale" values="1 .4;1 1;1 .6;1 .4" dur="1.45s" repeatCount="indefinite"/></rect>
+        <rect x="151" y="260" width="7" height="18" rx="1.5" fill="var(--chest-color)" opacity=".7" style="transform-origin:151px 278px"><animateTransform attributeName="transform" type="scale" values="1 .8;1 .3;1 1;1 .8" dur="1.2s" repeatCount="indefinite"/></rect>
+        <rect x="161" y="264" width="7" height="14" rx="1.5" fill="var(--chest-color)" opacity=".6" style="transform-origin:161px 278px"><animateTransform attributeName="transform" type="scale" values="1 1;1 .7;1 .2;1 1" dur="1.55s" repeatCount="indefinite"/></rect>
+        <path class="hover-ring" d="M96,154 Q92,208 96,294 L184,294 Q188,208 184,154 Q140,142 96,154 Z" fill="none" stroke="var(--chest-color)" stroke-width="2" opacity="0" filter="url(#f1)"/>
+      </g>
+
+      <!-- ARM LEFT -->
+      <g id="p-arm-l" class="robot-part" onclick="sel('arms',event)">
+        <path d="M32,183 Q28,198 30,268 L56,273 Q62,203 58,183 Q44,176 32,183 Z" fill="#07111e" stroke="#0a1c2c" stroke-width="1.5"/>
+        <path d="M34,193 Q44,190 56,193 L56,218 Q44,222 34,218 Z" fill="#060f1c"/>
+        <path d="M32,238 Q44,235 58,238" fill="none" stroke="#09182a" stroke-width="1"/>
+        <ellipse cx="44" cy="274" rx="14" ry="10" fill="#050c18" stroke="#0c1e2e" stroke-width="1.5"/>
+        <circle cx="44" cy="274" r="5.5" fill="#030810" stroke="var(--arm-color)" stroke-width="1" opacity=".4"/>
+        <path d="M30,278 Q28,352 30,366 L58,366 Q60,352 58,278 Z" fill="#060e1a" stroke="#0a1c2c" stroke-width="1.5"/>
+        <path d="M32,314 Q44,311 56,314" fill="none" stroke="#09182a" stroke-width="1"/>
+        <rect x="28" y="364" width="32" height="11" rx="4" fill="#06101c" stroke="#0a1c2c" stroke-width="1"/>
+        <path d="M26,374 Q26,408 30,420 L58,420 Q62,408 62,374 Z" fill="#060e1a" stroke="#0a1c2c" stroke-width="1.5"/>
+        <line x1="33" y1="374" x2="31" y2="420" stroke="#091828" stroke-width="1.2"/>
+        <line x1="41" y1="374" x2="40" y2="423" stroke="#091828" stroke-width="1.2"/>
+        <line x1="49" y1="374" x2="49" y2="423" stroke="#091828" stroke-width="1.2"/>
+        <line x1="57" y1="374" x2="58" y2="420" stroke="#091828" stroke-width="1.2"/>
+        <circle cx="41" cy="378" r="1.8" fill="var(--arm-color)" opacity=".3" filter="url(#f1)"/>
+        <circle cx="49" cy="378" r="1.8" fill="var(--arm-color)" opacity=".3" filter="url(#f1)"/>
+      </g>
+
+      <!-- ARM RIGHT -->
+      <g id="p-arm-r" class="robot-part" onclick="sel('arms',event)">
+        <path d="M222,183 Q218,198 220,268 L248,273 Q252,203 250,183 Q236,176 222,183 Z" fill="#07111e" stroke="#0a1c2c" stroke-width="1.5"/>
+        <path d="M224,193 Q236,190 248,193 L248,218 Q236,222 224,218 Z" fill="#060f1c"/>
+        <path d="M222,238 Q236,235 250,238" fill="none" stroke="#09182a" stroke-width="1"/>
+        <ellipse cx="236" cy="274" rx="14" ry="10" fill="#050c18" stroke="#0c1e2e" stroke-width="1.5"/>
+        <circle cx="236" cy="274" r="5.5" fill="#030810" stroke="var(--arm-color)" stroke-width="1" opacity=".4"/>
+        <path d="M222,278 Q220,352 222,366 L250,366 Q252,352 250,278 Z" fill="#060e1a" stroke="#0a1c2c" stroke-width="1.5"/>
+        <path d="M224,314 Q236,311 248,314" fill="none" stroke="#09182a" stroke-width="1"/>
+        <rect x="220" y="364" width="32" height="11" rx="4" fill="#06101c" stroke="#0a1c2c" stroke-width="1"/>
+        <path d="M218,374 Q218,408 222,420 L250,420 Q254,408 254,374 Z" fill="#060e1a" stroke="#0a1c2c" stroke-width="1.5"/>
+        <line x1="225" y1="374" x2="223" y2="420" stroke="#091828" stroke-width="1.2"/>
+        <line x1="233" y1="374" x2="232" y2="423" stroke="#091828" stroke-width="1.2"/>
+        <line x1="241" y1="374" x2="241" y2="423" stroke="#091828" stroke-width="1.2"/>
+        <line x1="249" y1="374" x2="250" y2="420" stroke="#091828" stroke-width="1.2"/>
+        <circle cx="233" cy="378" r="1.8" fill="var(--arm-color)" opacity=".3" filter="url(#f1)"/>
+        <circle cx="241" cy="378" r="1.8" fill="var(--arm-color)" opacity=".3" filter="url(#f1)"/>
+      </g>
+
+      <!-- PELVIS -->
+      <path d="M100,290 Q140,303 180,290 L178,318 Q140,330 102,318 Z" fill="#050d18" stroke="#091828" stroke-width="1.5"/>
+      <rect x="118" y="298" width="44" height="14" rx="5" fill="#040a14" stroke="var(--leg-color)" stroke-width=".7" opacity=".4"/>
+      <circle cx="140" cy="305" r="5" fill="#020810" stroke="var(--leg-color)" stroke-width="1" opacity=".6"/>
+      <circle cx="140" cy="305" r="2.5" fill="var(--leg-color)" opacity=".7"><animate attributeName="opacity" values=".3;.9;.3" dur="2.4s" repeatCount="indefinite"/></circle>
+      <circle cx="110" cy="316" r="10" fill="#040b18" stroke="#0c1e2e" stroke-width="1.5"/>
+      <circle cx="110" cy="316" r="5" fill="#030810" stroke="var(--leg-color)" stroke-width=".8" opacity=".5"/>
+      <circle cx="170" cy="316" r="10" fill="#040b18" stroke="#0c1e2e" stroke-width="1.5"/>
+      <circle cx="170" cy="316" r="5" fill="#030810" stroke="var(--leg-color)" stroke-width=".8" opacity=".5"/>
+
+      <!-- LEGS -->
+      <g id="p-legs" class="robot-part" onclick="sel('legs',event)">
+        <path d="M100,318 Q96,388 98,400 L132,400 Q134,388 130,318 Q116,312 100,318 Z" fill="#06101c" stroke="#091828" stroke-width="1.5"/>
+        <rect x="103" y="326" width="24" height="26" rx="4" fill="#050c18"/>
+        <rect x="103" y="327" width="24" height="3" rx="1.5" fill="var(--leg-color)" opacity=".2"/>
+        <ellipse cx="115" cy="402" rx="17" ry="12" fill="#040c18" stroke="#0c1e2e" stroke-width="1.5"/>
+        <ellipse cx="115" cy="402" rx="9" ry="6.5" fill="#020810" stroke="var(--leg-color)" stroke-width="1" opacity=".5"/>
+        <path d="M98,408 Q96,478 98,490 L132,490 Q134,478 132,408 Z" fill="#050d19" stroke="#091828" stroke-width="1.5"/>
+        <rect x="101" y="414" width="24" height="28" rx="3.5" fill="#040b16"/>
+        <rect x="101" y="414" width="24" height="3" rx="1.5" fill="var(--warm)" opacity=".35"/>
+        <rect x="94" y="488" width="40" height="13" rx="5" fill="#040c18" stroke="#091828" stroke-width="1.5"/>
+        <path d="M86,499 L88,513 L136,513 L138,499 Z" fill="#050d19" stroke="#091828" stroke-width="1.5"/>
+        <rect x="86" y="508" width="52" height="5" rx="2" fill="#040a14" stroke="#091828" stroke-width="1"/>
+        <path d="M150,318 Q148,388 148,400 L184,400 Q184,388 180,318 Q164,312 150,318 Z" fill="#06101c" stroke="#091828" stroke-width="1.5"/>
+        <rect x="153" y="326" width="24" height="26" rx="4" fill="#050c18"/>
+        <rect x="153" y="327" width="24" height="3" rx="1.5" fill="var(--leg-color)" opacity=".2"/>
+        <ellipse cx="165" cy="402" rx="17" ry="12" fill="#040c18" stroke="#0c1e2e" stroke-width="1.5"/>
+        <ellipse cx="165" cy="402" rx="9" ry="6.5" fill="#020810" stroke="var(--leg-color)" stroke-width="1" opacity=".5"/>
+        <path d="M148,408 Q146,478 148,490 L182,490 Q184,478 182,408 Z" fill="#050d19" stroke="#091828" stroke-width="1.5"/>
+        <rect x="151" y="414" width="24" height="28" rx="3.5" fill="#040b16"/>
+        <rect x="151" y="414" width="24" height="3" rx="1.5" fill="var(--warm)" opacity=".35"/>
+        <rect x="142" y="488" width="40" height="13" rx="5" fill="#040c18" stroke="#091828" stroke-width="1.5"/>
+        <path d="M142,499 L144,513 L192,513 L194,499 Z" fill="#050d19" stroke="#091828" stroke-width="1.5"/>
+        <rect x="142" y="508" width="52" height="5" rx="2" fill="#040a14" stroke="#091828" stroke-width="1"/>
+      </g>
+      </svg>
+
+      <button id="explode-btn" onclick="toggleExplode()">⬡ 分解視圖</button>
+    </div><!-- /rw -->
+  </div><!-- /robot-center -->
+
+  <!-- RIGHT: arm + leg cards -->
+  <div id="right-cards">
+    <div class="part-card" id="card-arms" style="--part-color:var(--arm-color)" onclick="sel('arms',event)">
+      <div class="pc-top"><span class="pc-icon">🦾</span>
+        <div><div class="pc-title">手臂與關節機構</div><div class="pc-sub">ACTUATOR · SERVO · HAPTICS</div></div>
+      </div>
+      <div class="pc-desc">精密多自由度關節、伺服馬達與力量感測器，賦予機器人靈活操作與觸覺感知能力。</div>
+      <div class="pc-tags"><span class="pc-tag">機構設計</span><span class="pc-tag">伺服控制</span><span class="pc-tag">觸覺感測</span></div>
+    </div>
+    <div class="part-card" id="card-legs" style="--part-color:var(--leg-color)" onclick="sel('legs',event)">
+      <div class="pc-top"><span class="pc-icon">🦿</span>
+        <div><div class="pc-title">腿部移動系統</div><div class="pc-sub">LOCOMOTION · BALANCE · RL</div></div>
+      </div>
+      <div class="pc-desc">仿生步態規劃與動態平衡演算法，讓機器人在複雜地形中穩定行走、奔跑與跳躍。</div>
+      <div class="pc-tags"><span class="pc-tag">步態規劃</span><span class="pc-tag">動態平衡</span><span class="pc-tag">強化學習</span></div>
+    </div>
+    <div class="part-card" id="card-sys" style="--part-color:var(--sys-color)" onclick="sel('sys',event)">
+      <div class="pc-top"><span class="pc-icon">🔗</span>
+        <div><div class="pc-title">系統整合層</div><div class="pc-sub">ROS 2 · BUS · BEHAVIOR TREE</div></div>
+      </div>
+      <div class="pc-desc">連結感知、運算、執行的隱形骨幹。ROS 2 訊息匯流排、行為樹任務規劃器與電源分配單元讓全身協調運作。</div>
+      <div class="pc-tags"><span class="pc-tag">ROS 2</span><span class="pc-tag">行為樹</span><span class="pc-tag">系統架構</span></div>
+    </div>
+  </div>
+
+</div><!-- /hero -->
+
+<!-- ── DETAIL ZONE ── -->
+<div id="detail-zone">
+  <div id="detail-placeholder">
+    <div class="bi">👆</div>
+    <div>點擊機器人部件或上方卡片<br>探索技術原理、科系方向與產業應用</div>
+  </div>
+
+  <!-- HEAD -->
+  <div class="detail-panel" id="dp-head" style="--part-color:var(--head-color)">
+    <div class="dp-header">
+      <div class="dp-icon-row"><span class="dp-icon">🧠</span><div><div class="dp-title">頭部感測系統</div><div class="dp-en">SENSOR · VISION · AI INFERENCE</div></div></div>
+      <div class="dp-tagline">機器人的感知中樞，整合視覺、聽覺、環境感知與 AI 推理，讓機器人「看懂世界」並做出智慧決策。</div>
+    </div>
+    <div class="dp-grid">
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">⚙️ 核心功能說明</div>
+          <div class="fn-list">
+            <div class="fn-item"><strong>立體視覺 / 深度感測</strong><span>雙目攝影機 + LiDAR 建立 3D 空間模型。Tesla Optimus 使用 4 個魚眼攝影機，視野達 300°。</span></div>
+            <div class="fn-item"><strong>AI 視覺辨識</strong><span>透過 CNN / Transformer 即時辨識人臉、物件、文字。推理晶片每秒可處理數百張影像。</span></div>
+            <div class="fn-item"><strong>語音與自然語言處理</strong><span>麥克風陣列 + NLP 模型讓機器人聽懂指令、進行多輪對話，理解語境與情緒。</span></div>
+            <div class="fn-item"><strong>IMU 頭部姿態感測</strong><span>偵測頭部旋轉角度，與主體平衡系統協作保持視角穩定。</span></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">🏭 產業應用</div>
+          <div class="industry-wrap">
+            <div class="ind-pill">🤖 人形機器人 <small>Tesla/Figure</small></div>
+            <div class="ind-pill">🚗 自動駕駛 <small>Waymo</small></div>
+            <div class="ind-pill">🏥 醫療 AI <small>手術輔助</small></div>
+            <div class="ind-pill">🏭 智慧製造 <small>瑕疵檢測</small></div>
+            <div class="ind-pill">🎮 AR/VR <small>空間運算</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">🎓 對應科系</div>
+          <div class="dept-grid">
+            <div class="dept-card core"><div class="dept-name">資訊工程</div><div class="dept-univ">台大・成大・交大・清大</div><div class="dept-desc">學 AI 演算法、電腦視覺、深度學習實作</div></div>
+            <div class="dept-card core"><div class="dept-name">電機工程</div><div class="dept-univ">台大・清大・中山・成大</div><div class="dept-desc">學感測器電路設計、FPGA、影像處理硬體</div></div>
+            <div class="dept-card core"><div class="dept-name">人工智慧</div><div class="dept-univ">台科大・北科大・陽明交大</div><div class="dept-desc">學機器學習、NLP、強化學習完整體系</div></div>
+            <div class="dept-card core"><div class="dept-name">光電工程</div><div class="dept-univ">交大・中央・逢甲</div><div class="dept-desc">學攝影模組、LiDAR 光學、雷射測距原理</div></div>
+          </div>
+          <div class="dept-related-label">相關科系</div>
+          <div class="dept-grid">
+            <div class="dept-card"><div class="dept-name">數學系</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">線性代數、機率論是 AI 模型的數學基礎</div></div>
+            <div class="dept-card"><div class="dept-name">統計學系</div><div class="dept-univ">台大・政大・中央</div><div class="dept-desc">統計推論支撐模型訓練與誤差分析</div></div>
+            <div class="dept-card"><div class="dept-name">認知科學</div><div class="dept-univ">台大（跨院）</div><div class="dept-desc">人類視覺感知原理啟發電腦視覺設計</div></div>
+            <div class="dept-card"><div class="dept-name">心理學系</div><div class="dept-univ">台大・政大・輔仁</div><div class="dept-desc">人機互動、語音情緒辨識的使用者研究</div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">💼 職涯路徑</div>
+          <div class="career-list">
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>電腦視覺工程師</strong><span>物件偵測、姿態估計｜Tesla AI、NVIDIA</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>感測器韌體工程師</strong><span>攝影機、LiDAR 驅動｜Velodyne</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>AI 研究員</strong><span>視覺基礎模型｜Google DeepMind</span></div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">📚 學習資源</div>
+          <div class="res-list">
+            <a class="res-link" href="https://cs231n.stanford.edu" target="_blank"><span class="res-icon">🎓</span><div class="res-info"><strong>Stanford CS231n</strong><span>深度學習電腦視覺（免費）</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://www.fast.ai" target="_blank"><span class="res-icon">⚡</span><div class="res-info"><strong>fast.ai</strong><span>實作導向深度學習課程</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://paperswithcode.com/task/object-detection" target="_blank"><span class="res-icon">📄</span><div class="res-info"><strong>Papers with Code</strong><span>最新視覺 AI 論文 + 程式碼</span></div><span class="res-arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHEST -->
+  <div class="detail-panel" id="dp-chest" style="--part-color:var(--chest-color)">
+    <div class="dp-header">
+      <div class="dp-icon-row"><span class="dp-icon">⚡</span><div><div class="dp-title">胸部核心模組</div><div class="dp-en">POWER · COMPUTE · COMMUNICATION</div></div></div>
+      <div class="dp-tagline">整合高密度電池組、中央運算單元與通訊模組，是機器人全身能量與資料的「心臟與大腦」。</div>
+    </div>
+    <div class="dp-grid">
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">⚙️ 核心功能說明</div>
+          <div class="fn-list">
+            <div class="fn-item"><strong>高密度電池系統</strong><span>4680 鋰電池組，Tesla Optimus 連續工作 8+ 小時，BMS 即時監控 48V 電力分配。</span></div>
+            <div class="fn-item"><strong>中央運算主機板</strong><span>ARM 多核心 + AI 加速晶片，運行 ROS 2，每秒協調 200+ 個感測器資料。</span></div>
+            <div class="fn-item"><strong>無線通訊模組</strong><span>5G / WiFi 6 / BT 5.0 三網並行，支援遠端遙控與 OTA 空中軟體更新。</span></div>
+            <div class="fn-item"><strong>熱管理系統</strong><span>液冷散熱管路維持核心溫度 70°C 以下，確保高負載穩定性。</span></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">🏭 產業應用</div>
+          <div class="industry-wrap">
+            <div class="ind-pill">🔋 電動車 <small>Tesla/鴻海</small></div>
+            <div class="ind-pill">🤖 機器人製造 <small>ABB/Fanuc</small></div>
+            <div class="ind-pill">📱 半導體 <small>聯發科</small></div>
+            <div class="ind-pill">☁️ 雲端 <small>AWS/Azure</small></div>
+            <div class="ind-pill">🌿 綠能儲電 <small>輝能科技</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">🎓 對應科系</div>
+          <div class="dept-grid">
+            <div class="dept-card core"><div class="dept-name">電機工程</div><div class="dept-univ">台大・清大・交大・成大</div><div class="dept-desc">學電力電子、BMS 電池管理、電源轉換器設計</div></div>
+            <div class="dept-card core"><div class="dept-name">資訊工程</div><div class="dept-univ">成大・中央・陽明交大</div><div class="dept-desc">學嵌入式系統、RTOS 即時作業系統、韌體開發</div></div>
+            <div class="dept-card core"><div class="dept-name">通訊工程</div><div class="dept-univ">交大・中山・台科大</div><div class="dept-desc">學 5G 通訊協議、無線網路設計、通訊晶片</div></div>
+            <div class="dept-card core"><div class="dept-name">材料科學</div><div class="dept-univ">台大・清大・中山</div><div class="dept-desc">學電池電極材料、固態電解質、導熱材料研發</div></div>
+          </div>
+          <div class="dept-related-label">相關科系</div>
+          <div class="dept-grid">
+            <div class="dept-card"><div class="dept-name">物理學系</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">固態物理、半導體物理是晶片製造的理論根基</div></div>
+            <div class="dept-card"><div class="dept-name">化學系</div><div class="dept-univ">台大・清大・中興</div><div class="dept-desc">電池電解質配方、固態電池化學反應機制</div></div>
+            <div class="dept-card"><div class="dept-name">工業工程</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">系統可靠度分析、熱管理測試與製造流程</div></div>
+            <div class="dept-card"><div class="dept-name">化學工程</div><div class="dept-univ">台大・清大・中央</div><div class="dept-desc">電池量產製程設計、電化學工程應用</div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">💼 職涯路徑</div>
+          <div class="career-list">
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>電池系統工程師</strong><span>BMS 與電池組設計｜台達電、輝能</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>嵌入式系統工程師</strong><span>RTOS、驅動程式開發｜聯發科</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>機器人軟體架構師</strong><span>ROS 2 系統設計｜ABB、鴻海</span></div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">📚 學習資源</div>
+          <div class="res-list">
+            <a class="res-link" href="https://www.ros.org" target="_blank"><span class="res-icon">🤖</span><div class="res-info"><strong>ROS 官方網站</strong><span>機器人作業系統入門到進階</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://batteryuniversity.com" target="_blank"><span class="res-icon">🔋</span><div class="res-info"><strong>Battery University</strong><span>電池技術完整教學（免費）</span></div><span class="res-arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARMS -->
+  <div class="detail-panel" id="dp-arms" style="--part-color:var(--arm-color)">
+    <div class="dp-header">
+      <div class="dp-icon-row"><span class="dp-icon">🦾</span><div><div class="dp-title">手臂與關節機構</div><div class="dp-en">ACTUATOR · MECHANISM · HAPTICS</div></div></div>
+      <div class="dp-tagline">仿人體骨骼的多自由度機械結構，結合伺服馬達、力量感測與觸覺回饋，賦予機器人精準操控能力。</div>
+    </div>
+    <div class="dp-grid">
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">⚙️ 核心功能說明</div>
+          <div class="fn-list">
+            <div class="fn-item"><strong>多自由度關節</strong><span>每臂 7 DOF（肩 3＋肘 1＋腕 3），手部 11–15 DOF 五指獨立控制，接近人手靈活度。</span></div>
+            <div class="fn-item"><strong>BLDC 馬達 + 減速機</strong><span>高扭矩無刷直流馬達搭配諧波或 RV 減速機，輸出扭矩達 150Nm，backdrivable 設計確保碰撞安全。台灣上銀科技提供諧波減速機與關節模組，台達電供應 AC 伺服驅動器。</span></div>
+            <div class="fn-item"><strong>六軸力/力矩感測器</strong><span>同時量測三向力（Fx Fy Fz）與三向力矩（Tx Ty Tz），感知 0.1N 接觸力，實現阻抗控制（Impedance Control）柔順操作。</span></div>
+            <div class="fn-item"><strong>觸覺皮膚 / 滑動偵測</strong><span>壓力感測陣列覆蓋手掌與指尖，毫秒級偵測滑動事件，辨識物體形狀、質地，最佳化抓握力。</span></div>
+          </div>
+        </div>
+        <div class="dp-box" style="border-color:rgba(255,208,96,.35);background:rgba(255,208,96,.05)">
+          <div class="dp-section-title" style="color:#ffd060">🇹🇼 台灣供應鏈的角色</div>
+          <div class="fn-list">
+            <div class="fn-item"><strong style="color:#ffd060">上銀科技（Hiwin）</strong><span>提供諧波減速機、RV 減速機、線性滑軌與滾珠螺桿，已與國際人形機器人廠商合作設計關節模組，被國際投資機構列入「全球前 100 家人形機器人相關企業」，2026 年預計量產物流機器人。</span></div>
+            <div class="fn-item"><strong style="color:#ffd060">台達電子（Delta Electronics）</strong><span>提供 AC 伺服馬達與驅動器、六軸機器人、SCARA 機器人及工業控制器，伺服系統廣泛應用於高精度機器人平台，是台灣機器人供應鏈核心廠商。</span></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">🏭 產業應用</div>
+          <div class="industry-wrap">
+            <div class="ind-pill">🏭 精密製造 <small>上銀/廣明</small></div>
+            <div class="ind-pill">🏥 醫療義肢 <small>復健輔具</small></div>
+            <div class="ind-pill">🔬 半導體 <small>晶圓搬運</small></div>
+            <div class="ind-pill">🍱 食品包裝 <small>自動化產線</small></div>
+            <div class="ind-pill">🪐 太空 <small>NASA 機械臂</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">🎓 對應科系</div>
+          <div class="dept-grid">
+            <div class="dept-card core"><div class="dept-name">機械工程</div><div class="dept-univ">台大・清大・成大・中山</div><div class="dept-desc">學機構設計、動力學、精密傳動、製造工程</div></div>
+            <div class="dept-card core"><div class="dept-name">機電整合</div><div class="dept-univ">台科大・北科大・中原</div><div class="dept-desc">學馬達控制、感測融合、機電系統整合</div></div>
+            <div class="dept-card core"><div class="dept-name">控制工程</div><div class="dept-univ">交大・中山・中正</div><div class="dept-desc">學 PID/阻抗控制、軌跡規劃、伺服系統</div></div>
+            <div class="dept-card core"><div class="dept-name">生醫工程</div><div class="dept-univ">台大・陽明交大・輔仁</div><div class="dept-desc">學義肢設計、觸覺感測、人體工學仿生</div></div>
+          </div>
+          <div class="dept-related-label">相關科系</div>
+          <div class="dept-grid">
+            <div class="dept-card"><div class="dept-name">物理學系</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">力學與電磁學是馬達運作與感測器設計的理論核心</div></div>
+            <div class="dept-card"><div class="dept-name">電機工程</div><div class="dept-univ">台大・清大・交大</div><div class="dept-desc">馬達驅動電路、功率放大器、電磁設計</div></div>
+            <div class="dept-card"><div class="dept-name">化學系</div><div class="dept-univ">台大・清大・中興</div><div class="dept-desc">關節潤滑材料、輕量化複合材料合成</div></div>
+            <div class="dept-card"><div class="dept-name">工業設計</div><div class="dept-univ">成大・台科大・實踐</div><div class="dept-desc">人因工程、外觀設計、使用者體驗研究</div></div>
+            <div class="dept-card"><div class="dept-name">醫學系</div><div class="dept-univ">台大・陽明・成大</div><div class="dept-desc">手部解剖學提供仿生抓握動作的設計依據</div></div>
+            <div class="dept-card"><div class="dept-name">職能治療</div><div class="dept-univ">台大・成大・慈濟</div><div class="dept-desc">評估義肢操作功能、設計復健訓練流程</div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">💼 職涯路徑</div>
+          <div class="career-list">
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>機器人機構工程師</strong><span>關節與傳動設計｜Boston Dynamics</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>馬達控制工程師</strong><span>FOC 驅動演算法｜台達電、東元</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>工業機器手臂工程師</strong><span>CNC 整合｜上銀科技、廣明</span></div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">📚 學習資源</div>
+          <div class="res-list">
+            <a class="res-link" href="https://modernrobotics.northwestern.edu" target="_blank"><span class="res-icon">📖</span><div class="res-info"><strong>Modern Robotics（Northwestern）</strong><span>免費機器人學教科書 + Coursera</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://manipulation.csail.mit.edu" target="_blank"><span class="res-icon">🤖</span><div class="res-info"><strong>MIT 機器人操控課程</strong><span>Russ Tedrake 開放課程</span></div><span class="res-arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEGS -->
+  <div class="detail-panel" id="dp-legs" style="--part-color:var(--leg-color)">
+    <div class="dp-header">
+      <div class="dp-icon-row"><span class="dp-icon">🦿</span><div><div class="dp-title">腿部移動系統</div><div class="dp-en">LOCOMOTION · BALANCE · GAIT PLANNING</div></div></div>
+      <div class="dp-tagline">仿生步態控制結合動態平衡演算法，讓機器人在任何地形穩定行走，是機器人學最具挑戰的領域之一。</div>
+    </div>
+    <div class="dp-grid">
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">⚙️ 核心功能說明</div>
+          <div class="fn-list">
+            <div class="fn-item"><strong>動態步態規劃</strong><span>MPC + WBC 以 1kHz 頻率即時計算落腳點，達到時速 8km 穩定行走。</span></div>
+            <div class="fn-item"><strong>強化學習步態訓練</strong><span>在 MuJoCo/Isaac Sim 訓練後遷移至實體（sim-to-real），自動習得各地形步態。</span></div>
+            <div class="fn-item"><strong>足部六軸 F/T 感測</strong><span>感知地面材質（鬆軟、濕滑），即時調整步態策略。</span></div>
+            <div class="fn-item"><strong>IMU 全身姿態感測</strong><span>1000Hz 量測，受外力推撞時 50ms 內啟動反射性恢復動作。</span></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">🏭 產業應用</div>
+          <div class="industry-wrap">
+            <div class="ind-pill">🤖 人形機器人 <small>Agility/Figure</small></div>
+            <div class="ind-pill">🐕 四足機器人 <small>Spot 巡邏</small></div>
+            <div class="ind-pill">🏥 復健外骨骼 <small>醫療輔具</small></div>
+            <div class="ind-pill">🏗️ 災難搜救 <small>工程探勘</small></div>
+            <div class="ind-pill">🪖 軍事後勤 <small>搬運</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">🎓 對應科系</div>
+          <div class="dept-grid">
+            <div class="dept-card core"><div class="dept-name">電機工程</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">學控制理論、馬達驅動、IMU 狀態估計</div></div>
+            <div class="dept-card core"><div class="dept-name">資訊工程</div><div class="dept-univ">台大・交大・中央</div><div class="dept-desc">學強化學習、運動規劃、即時控制系統</div></div>
+            <div class="dept-card core"><div class="dept-name">機械工程</div><div class="dept-univ">清大・成大・中山</div><div class="dept-desc">學動力學、仿生結構設計、步態生物力學</div></div>
+            <div class="dept-card core"><div class="dept-name">機電整合</div><div class="dept-univ">台科大・北科大</div><div class="dept-desc">學感測器整合、關節驅動、機器人學實作</div></div>
+          </div>
+          <div class="dept-related-label">相關科系</div>
+          <div class="dept-grid">
+            <div class="dept-card"><div class="dept-name">數學系</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">凸最佳化、變分法是 MPC 步態規劃的數學骨幹</div></div>
+            <div class="dept-card"><div class="dept-name">物理學系</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">拉格朗日力學、剛體動力學直接對應步態方程</div></div>
+            <div class="dept-card"><div class="dept-name">運動科學</div><div class="dept-univ">台師大・體大・北體</div><div class="dept-desc">人體步態生物力學資料是訓練機器人步態的原始依據</div></div>
+            <div class="dept-card"><div class="dept-name">神經科學</div><div class="dept-univ">台大・陽明交大</div><div class="dept-desc">中樞模式產生器（CPG）仿生步態控制器的靈感來源</div></div>
+            <div class="dept-card"><div class="dept-name">生醫工程</div><div class="dept-univ">台大・陽明交大・慈濟</div><div class="dept-desc">將步態控制技術應用於外骨骼與下肢義肢</div></div>
+            <div class="dept-card"><div class="dept-name">應用數學</div><div class="dept-univ">台大・清大・中央</div><div class="dept-desc">微分方程、數值方法支撐模擬與控制器設計</div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">💼 職涯路徑</div>
+          <div class="career-list">
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>足式機器人控制工程師</strong><span>步態規劃與平衡控制｜Boston Dynamics</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>運動規劃研究員</strong><span>MPC/WBC 控制框架｜CMU・MIT</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>機器人模擬工程師</strong><span>sim-to-real 訓練環境｜NVIDIA Isaac</span></div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">📚 學習資源</div>
+          <div class="res-list">
+            <a class="res-link" href="https://underactuated.mit.edu" target="_blank"><span class="res-icon">📖</span><div class="res-info"><strong>MIT Underactuated Robotics</strong><span>動態機器人開放課程</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://leggedrobotics.github.io/legged_gym" target="_blank"><span class="res-icon">🐾</span><div class="res-info"><strong>ETH Legged Gym</strong><span>足式機器人強化學習開源框架</span></div><span class="res-arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- SYS INTEGRATION -->
+  <div class="detail-panel" id="dp-sys" style="--part-color:var(--sys-color)">
+    <div class="dp-header">
+      <div class="dp-icon-row"><span class="dp-icon">🔗</span><div><div class="dp-title">系統整合層</div><div class="dp-en">ROS 2 · BEHAVIOR TREE · PDU · CAN BUS</div></div></div>
+      <div class="dp-tagline">機器人各子系統的「隱形骨幹」。將感測資料、AI 決策、馬達指令串接成一致的運作整體，是機器人能否協調動作的關鍵所在。</div>
+    </div>
+    <div class="dp-grid">
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">⚙️ 核心功能說明</div>
+          <div class="fn-list">
+            <div class="fn-item"><strong>ROS 2 訊息匯流排</strong><span>機器人作業系統（Robot Operating System 2）提供 topic / service / action 三層通訊架構，讓頭部視覺、手臂馬達、腿部控制器各自獨立運作又能即時交換資料，每秒處理 200+ 個訊息節點。</span></div>
+            <div class="fn-item"><strong>行為樹（Behavior Tree）任務規劃</strong><span>將複雜任務拆解成可組合的樹狀結構（Sequence、Selector、Parallel 節點），讓機器人依條件切換「搬運箱子」→「避障」→「回充電站」等任務，比有限狀態機更易維護與擴充。</span></div>
+            <div class="fn-item"><strong>CAN Bus / EtherCAT 現場總線</strong><span>硬即時通訊協議連接所有關節馬達驅動器，控制週期 1ms，確保 20 個關節同步在誤差 ±0.1ms 內執行動作，是精準協調的物理基礎。</span></div>
+            <div class="fn-item"><strong>電源分配單元（PDU）</strong><span>集中管理 48V 主匯流排到各子系統（運算板 12V、感測器 5V、馬達 48V）的動態分配，突發負載時優先保障運動控制，防止因電壓驟降導致跌倒。</span></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">🏭 產業應用</div>
+          <div class="industry-wrap">
+            <div class="ind-pill">🤖 人形機器人 <small>Tesla/Figure</small></div>
+            <div class="ind-pill">🏭 工業自動化 <small>ABB/Fanuc</small></div>
+            <div class="ind-pill">🚗 自動駕駛 <small>Apollo/Waymo</small></div>
+            <div class="ind-pill">🛸 無人機群 <small>協同任務</small></div>
+            <div class="ind-pill">🏥 手術機器人 <small>達文西</small></div>
+            <div class="ind-pill">🌐 IoT 智慧工廠 <small>邊緣運算</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="dp-col">
+        <div class="dp-box">
+          <div class="dp-section-title">🎓 對應科系</div>
+          <div class="dept-grid">
+            <div class="dept-card core"><div class="dept-name">資訊工程</div><div class="dept-univ">台大・交大・成大</div><div class="dept-desc">學作業系統、分散式系統、軟體架構設計</div></div>
+            <div class="dept-card core"><div class="dept-name">電機工程</div><div class="dept-univ">台大・清大・中山</div><div class="dept-desc">學即時系統、CAN/EtherCAT 現場總線、電源管理</div></div>
+            <div class="dept-card core"><div class="dept-name">機電整合</div><div class="dept-univ">台科大・北科大</div><div class="dept-desc">學感測融合、機器人學、跨領域系統整合實作</div></div>
+            <div class="dept-card core"><div class="dept-name">資訊管理</div><div class="dept-univ">台大・政大・中山</div><div class="dept-desc">學系統分析設計、DevOps、IT 架構規劃</div></div>
+          </div>
+          <div class="dept-related-label">相關科系</div>
+          <div class="dept-grid">
+            <div class="dept-card"><div class="dept-name">工業工程</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">系統可靠度分析、生產流程最佳化、品質管理</div></div>
+            <div class="dept-card"><div class="dept-name">機械工程</div><div class="dept-univ">台大・清大・中山</div><div class="dept-desc">了解執行端需求才能設計合理的指令介面</div></div>
+            <div class="dept-card"><div class="dept-name">管理學院</div><div class="dept-univ">台大・政大・成大</div><div class="dept-desc">大型機器人系統的專案管理與跨團隊協調</div></div>
+            <div class="dept-card"><div class="dept-name">數學系</div><div class="dept-univ">台大・清大・成大</div><div class="dept-desc">圖論、佇列理論支撐任務排程與訊息路由設計</div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">💼 職涯路徑</div>
+          <div class="career-list">
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>機器人軟體架構師</strong><span>設計 ROS 2 系統拓撲與通訊協議｜Boston Dynamics、鴻海</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>系統整合工程師</strong><span>整合感測、運算、執行器三層介面｜ABB、安川電機</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>韌體 / 驅動工程師</strong><span>開發 CAN/EtherCAT 協議底層｜台達電、廣明光電</span></div></div>
+            <div class="career-item"><div class="career-dot"></div><div class="career-info"><strong>DevOps / MLOps 工程師</strong><span>管理機器人 OTA 更新與持續部署流程｜Tesla AI</span></div></div>
+          </div>
+        </div>
+        <div class="dp-box">
+          <div class="dp-section-title">📚 學習資源</div>
+          <div class="res-list">
+            <a class="res-link" href="https://docs.ros.org/en/humble/index.html" target="_blank"><span class="res-icon">🤖</span><div class="res-info"><strong>ROS 2 Humble 官方文件</strong><span>完整 ROS 2 架構與 API 參考</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://www.behaviortree.dev" target="_blank"><span class="res-icon">🌳</span><div class="res-info"><strong>BehaviorTree.CPP</strong><span>工業級行為樹開源框架文件</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://www.coursera.org/learn/robotics-software-developer" target="_blank"><span class="res-icon">🎓</span><div class="res-info"><strong>Coursera 機器人軟體開發</strong><span>ROS 架構與系統設計課程</span></div><span class="res-arrow">→</span></a>
+            <a class="res-link" href="https://github.com/ros-planning/navigation2" target="_blank"><span class="res-icon">🔀</span><div class="res-info"><strong>Nav2 導航框架（GitHub）</strong><span>ROS 2 完整自主導航系統範例</span></div><span class="res-arrow">→</span></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /detail-zone -->
+</div><!-- /pg-robot -->
+
+<!-- ══ PAGE: HISTORY ══ -->
+<div id="pg-history" class="page">
+  <div class="pg-hero">
+    <h1>機器人<em>發展史</em></h1>
+    <p>從工廠機械臂到能跑能跳的人形機器人，七十年間每次突破都重塑了機器人的定義。點擊年代展開詳情。</p>
+  </div>
+
+  <div id="tl">
+
+    <div class="tl-era" style="--ec:#00d4ff" onclick="toggleEra(this)">
+      <div class="tl-axis"><div class="tl-dot"></div></div>
+      <div class="tl-body">
+        <div class="tl-header">
+          <div class="tl-year">1950s – 1970s</div>
+          <div class="tl-title">工業機械臂的誕生</div>
+          <span class="tl-tag">機構設計 / 電動驅動</span>
+          <div class="tl-hint">點擊展開里程碑</div>
+        </div>
+        <div class="tl-expand">
+          <img class="tl-img" id="era-img-1" alt="Unimate 工業機械臂，1961 年通用汽車工廠">
+          <div class="tl-img-caption">Unimate，1961 年通用汽車 Trenton 工廠</div>
+          <div class="tl-ms"><strong>1954 — Unimate 誕生</strong><span>George Devol 取得可程式化機械臂專利，1961 年在通用汽車工廠商業部署，負責搬運高溫鑄件，開啟工業自動化。</span></div>
+          <div class="tl-ms"><strong>1969 — Stanford Arm</strong><span>全電動六自由度機械臂，成為現代工業臂原型，奠定沿用至今的 6-DOF 架構標準。</span></div>
+          <div class="tl-ms"><strong>1973 — KUKA FAMULUS</strong><span>全球第一台電腦完整控制六軸的工業機器人，精度與可重現性大幅超越液壓機型。</span></div>
+          <div class="tl-insight">
+            <div class="tl-insight-lbl">突破意義</div>
+            <p>確立「可重複程式化」概念：機器人不再只執行固定動作，而是可被程式改變行為，這是所有現代機器人的根基。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-era" style="--ec:#00f080" onclick="toggleEra(this)">
+      <div class="tl-axis"><div class="tl-dot"></div></div>
+      <div class="tl-body">
+        <div class="tl-header">
+          <div class="tl-year">1980s – 1990s</div>
+          <div class="tl-title">電腦整合與感測革命</div>
+          <span class="tl-tag">微處理器 / 機器視覺</span>
+          <div class="tl-hint">點擊展開里程碑</div>
+        </div>
+        <div class="tl-expand">
+          <img class="tl-img" id="era-img-2" alt="Honda P 系列雙足步行機器人研究">
+          <div class="tl-img-caption">Honda P 系列（1986–2000），歷時 11 年的雙足步行研究計畫</div>
+          <div class="tl-ms"><strong>1981 — SCARA 機器人</strong><span>山梨大學牧野洋教授發明，專為平面裝配設計，速度與精度遠超傳統臂，至今仍主導電子業產線。</span></div>
+          <div class="tl-ms"><strong>1984 — Wabot-2（早稻田大學）</strong><span>能演奏電子琴的人形機器人，展示手指精細控制與視覺追譜，仿人形研究正式起步。</span></div>
+          <div class="tl-ms"><strong>1986 — HONDA P 系列啟動</strong><span>本田秘密啟動仿人形步行計畫，耗時 11 年最終催生 ASIMO，奠定雙足步行工程基礎。</span></div>
+          <div class="tl-ms"><strong>1992 — 機器視覺商用化</strong><span>CCD 攝影機與影像處理晶片成本下降，工廠瑕疵檢測普及，機器人首次獲得真正的「眼睛」。</span></div>
+          <div class="tl-insight">
+            <div class="tl-insight-lbl">突破意義</div>
+            <p>機器人從「盲目」變成「有感知」——感測器讓機器人能根據環境即時調整動作，邁向自主性的第一步。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-era" style="--ec:#ff8c42" onclick="toggleEra(this)">
+      <div class="tl-axis"><div class="tl-dot"></div></div>
+      <div class="tl-body">
+        <div class="tl-header">
+          <div class="tl-year">2000s</div>
+          <div class="tl-title">動力學突破與 DARPA 挑戰賽</div>
+          <span class="tl-tag">動態平衡 / 自主導航</span>
+          <div class="tl-hint">點擊展開里程碑</div>
+        </div>
+        <div class="tl-expand">
+          <img class="tl-img" id="era-img-3" alt="Boston Dynamics BigDog 四足機器人">
+          <div class="tl-img-caption">Boston Dynamics BigDog，2005 年液壓四足機器人</div>
+          <div class="tl-ms"><strong>2000 — ASIMO 正式發表</strong><span>本田 ASIMO 穩定雙足步行驚豔全球，首度展示動態步態切換，但仍需預先規劃地形。</span></div>
+          <div class="tl-ms"><strong>2004/05 — DARPA Grand Challenge</strong><span>無人車在莫哈維沙漠自主競賽，催生現代自動駕駛與機器人感知技術整個生態系。</span></div>
+          <div class="tl-ms"><strong>2005 — BigDog（波士頓動力）</strong><span>液壓四足機器人在冰面、碎石、斜坡保持平衡，被推撞後自動恢復，動態平衡進入新境界。</span></div>
+          <div class="tl-ms"><strong>2007 — DARPA Urban Challenge</strong><span>無人車在真實城市交通互動，建立感知-規劃-執行（Sense-Plan-Act）完整框架。</span></div>
+          <div class="tl-insight">
+            <div class="tl-insight-lbl">突破意義</div>
+            <p>「競賽驅動研究」誕生：DARPA 用獎金凝聚全球工程師，五年內讓自主導航從不可能變成商業產品。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-era" style="--ec:#b060ff" onclick="toggleEra(this)">
+      <div class="tl-axis"><div class="tl-dot"></div></div>
+      <div class="tl-body">
+        <div class="tl-header">
+          <div class="tl-year">2010s</div>
+          <div class="tl-title">深度學習革命</div>
+          <span class="tl-tag">深度學習 / 強化學習 / GPU</span>
+          <div class="tl-hint">點擊展開里程碑</div>
+        </div>
+        <div class="tl-expand">
+          <img class="tl-img" id="era-img-4" alt="Boston Dynamics Atlas 機器人">
+          <div class="tl-img-caption">Boston Dynamics Atlas，2016 年完成後空翻</div>
+          <div class="tl-ms"><strong>2012 — AlexNet 震撼影像辨識</strong><span>ImageNet 錯誤率從 26% 驟降至 15.3%，機器人電腦視覺全面轉向深度學習。</span></div>
+          <div class="tl-ms"><strong>2013 — DARPA Robotics Challenge</strong><span>Atlas 等機器人展示複雜救援操作，同時暴露現有控制架構極限，倒地畫面成為經典。</span></div>
+          <div class="tl-ms"><strong>2016 — Atlas 後空翻</strong><span>波士頓動力 Atlas 完成完整後空翻，強化學習與最佳化控制開始接管運動規劃。</span></div>
+          <div class="tl-ms"><strong>2017 — 強化學習爆發</strong><span>sim-to-real 技術成熟，研究者在 MuJoCo 訓練後直接遷移到實體機器人。</span></div>
+          <div class="tl-insight">
+            <div class="tl-insight-lbl">突破意義</div>
+            <p>機器人從「被編程」到「自己學習」——給機器人環境與目標，讓它在試錯中學會，這是通用機器人的關鍵轉折。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-era" style="--ec:#ffd060" onclick="toggleEra(this)">
+      <div class="tl-axis"><div class="tl-dot"></div></div>
+      <div class="tl-body">
+        <div class="tl-header">
+          <div class="tl-year">2020s</div>
+          <div class="tl-title">人形機器人商業爆發</div>
+          <span class="tl-tag">LLM / 具身智能 / 供應鏈</span>
+          <div class="tl-hint">點擊展開里程碑</div>
+        </div>
+        <div class="tl-expand">
+          <img class="tl-img" id="era-img-5" alt="Tesla Optimus 人形機器人">
+          <div class="tl-img-caption">Tesla Optimus，2022 年 AI Day 首次亮相</div>
+          <div class="tl-ms"><strong>2021 — Tesla Optimus 宣告</strong><span>將 FSD 自動駕駛感知架構移植到人形機器人，重新定義「通用執行器」的商業邏輯。</span></div>
+          <div class="tl-ms"><strong>2022 — ChatGPT 引爆具身智能</strong><span>LLM 與機器人結合，機器人能理解自然語言規劃多步任務，具身智能成為最熱研究方向。</span></div>
+          <div class="tl-ms"><strong>2023/26 — Agility Digit 進亞馬遜倉庫</strong><span>人形機器人首次在真實商業環境執行回收空箱等重複性任務，從技術展示走入工程驗證。2026 年 Agility 宣布擴大合作，目標年產 10,000 台並大量部署於倉儲與門市後場。</span></div>
+          <div class="tl-ms"><strong>2024 — Unitree G1 量產，售 16,000 美元</strong><span>成本從第一代 H1 的約 90,000 美元壓縮至十分之一，高度 1.3m、重 35kg、最高 43 DOF，標榜針對教育與研發市場的「平價人形平台」，台灣精密供應鏈（減速機、伺服馬達）同步進場。</span></div>
+          <div class="tl-insight">
+            <div class="tl-insight-lbl">突破意義</div>
+            <p>機器人進入「iPhone 時刻」：成本曲線急速下滑、生態系成形。這個產業的關鍵人才，正是今天的高中生。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tl -->
+</div><!-- /pg-history -->
+
+<!-- ══ PAGE: CIV ══ -->
+<div id="pg-civ" class="page">
+
+  <div class="civ-hero">
+    <h1>⚡ 技術文明的<em>交匯</em></h1>
+    <p>今天的人形機器人不是某個天才的單一發明，而是四條平行的人類文明脈絡，歷經千年各自演進，在 2020 年代交匯的結晶。</p>
+  </div>
+
+  <!-- convergence overview — 2×2 + centre -->
+  <div class="civ-converge-wrap">
+    <div class="civ-converge">
+
+      <!-- TL: 機械 -->
+      <div class="civ-stream pos-tl" style="--sc:#ff8c42" onclick="setCivTab('mech')">
+        <div class="civ-stream-top">
+          <div class="civ-stream-icon">🏛️</div>
+          <div class="civ-stream-label">機械與<br>自動機</div>
+        </div>
+        <div class="civ-stream-nodes">
+          <div class="civ-node-pill">顏師人偶 ~1000 BCE</div>
+          <div class="civ-node-pill">Hero 自動劇場 70 CE</div>
+          <div class="civ-node-pill">Al-Jazari 1206</div>
+          <div class="civ-node-pill">達文西騎士 1495</div>
+          <div class="civ-node-pill">Karakuri 1662</div>
+          <div class="civ-node-pill">Unimate 1961</div>
+        </div>
+      </div>
+
+      <!-- centre col top: spacer -->
+      <div style="grid-area:tl/ct/tr/ct"></div>
+
+      <!-- TR: 能源 -->
+      <div class="civ-stream pos-tr" style="--sc:#00f080" onclick="setCivTab('energy')">
+        <div class="civ-stream-top">
+          <div class="civ-stream-icon">💡</div>
+          <div class="civ-stream-label">能源與<br>動力</div>
+        </div>
+        <div class="civ-stream-nodes">
+          <div class="civ-node-pill">瓦特蒸汽機 1769</div>
+          <div class="civ-node-pill">法拉第感應 1831</div>
+          <div class="civ-node-pill">特斯拉馬達 1888</div>
+          <div class="civ-node-pill">液壓技術 1960s</div>
+          <div class="civ-node-pill">鋰電池 1991</div>
+          <div class="civ-node-pill">固態電池 2020s</div>
+        </div>
+      </div>
+
+      <!-- CENTRE: robot node with SVG arrows -->
+      <div class="civ-centre">
+        <div class="civ-centre-ring2"></div>
+        <div class="civ-centre-ring"></div>
+        <div class="civ-centre-inner">
+          <span class="civ-centre-icon">🤖</span>
+          <div class="civ-centre-label">2020s<br>人形機器人</div>
+        </div>
+        <!-- SVG diagonal arrows from each corner toward centre -->
+        <svg class="civ-connectors" viewBox="-300 -150 600 300" preserveAspectRatio="none" style="position:absolute;inset:-150px -300px;width:calc(100% + 600px);height:calc(100% + 300px);pointer-events:none;z-index:0">
+          <defs>
+            <marker id="arr-amber" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="rgba(255,140,66,.6)"/></marker>
+            <marker id="arr-green" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="rgba(0,240,128,.6)"/></marker>
+            <marker id="arr-cyan" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="rgba(0,212,255,.6)"/></marker>
+            <marker id="arr-purple" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="rgba(176,96,255,.6)"/></marker>
+          </defs>
+          <!-- TL → centre -->
+          <line x1="-260" y1="-110" x2="-48" y2="-22" stroke="rgba(255,140,66,.45)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr-amber)"/>
+          <!-- TR → centre -->
+          <line x1="260" y1="-110" x2="48" y2="-22" stroke="rgba(0,240,128,.45)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr-green)"/>
+          <!-- BL → centre -->
+          <line x1="-260" y1="110" x2="-48" y2="22" stroke="rgba(0,212,255,.45)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr-cyan)"/>
+          <!-- BR → centre -->
+          <line x1="260" y1="110" x2="48" y2="22" stroke="rgba(176,96,255,.45)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arr-purple)"/>
+        </svg>
+      </div>
+
+      <!-- BL: 電腦 -->
+      <div class="civ-stream pos-bl" style="--sc:#00d4ff" onclick="setCivTab('computer')">
+        <div class="civ-stream-top">
+          <div class="civ-stream-icon">💻</div>
+          <div class="civ-stream-label">電腦與<br>程式化</div>
+        </div>
+        <div class="civ-stream-nodes">
+          <div class="civ-node-pill">賈卡織機 1801</div>
+          <div class="civ-node-pill">Babbage／Ada 1837</div>
+          <div class="civ-node-pill">圖靈機 1936</div>
+          <div class="civ-node-pill">電晶體 1947</div>
+          <div class="civ-node-pill">積體電路 1958</div>
+          <div class="civ-node-pill">Intel 4004 1971</div>
+        </div>
+      </div>
+
+      <!-- BR: AI -->
+      <div class="civ-stream pos-br" style="--sc:#b060ff" onclick="setCivTab('ai')">
+        <div class="civ-stream-top">
+          <div class="civ-stream-icon">🧠</div>
+          <div class="civ-stream-label">AI 與<br>演算法</div>
+        </div>
+        <div class="civ-stream-nodes">
+          <div class="civ-node-pill">達特茅斯 1956</div>
+          <div class="civ-node-pill">AI 寒冬 1974/87</div>
+          <div class="civ-node-pill">反向傳播 1986</div>
+          <div class="civ-node-pill">Deep Blue 1997</div>
+          <div class="civ-node-pill">Transformer 2017</div>
+          <div class="civ-node-pill">ChatGPT 2022</div>
+        </div>
+      </div>
+
+    </div>
+    <p style="text-align:center;font-size:10px;color:var(--chrome);margin-top:12px;letter-spacing:1px">點擊任一方塊 → 深入探索該條脈絡</p>
+  </div>
+
+  <!-- sub-tabs -->
+  <div class="civ-tabs">
+    <button class="civ-tab active" style="--tc:#ff8c42" onclick="setCivTab('mech')">🏛️ 機械與自動機</button>
+    <button class="civ-tab" style="--tc:#00f080" onclick="setCivTab('energy')">💡 能源與動力</button>
+    <button class="civ-tab" style="--tc:#00d4ff" onclick="setCivTab('computer')">💻 電腦與程式化</button>
+    <button class="civ-tab" style="--tc:#b060ff" onclick="setCivTab('ai')">🧠 AI 與演算法</button>
+  </div>
+
+  <!-- ── PANEL: MECH ── -->
+  <div class="civ-panel active" id="civp-mech" style="--tc:#ff8c42">
+    <div class="civ-tl">
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">約 1000 BCE · 中國</div>
+        <div class="civ-tl-title">顏師的歌舞人偶</div>
+        <div class="civ-tl-who">《列子·湯問》記載</div>
+        <div class="civ-tl-desc">道家典籍《列子》記載，周穆王時期工匠顏師向王獻上一個等身機械人偶，能行走、唱歌、眨眼、向宮女拋媚眼——穆王大怒，以為是真人。顏師當場拆解，讓王看見內部全是木、革、膠、漆構成的精密機構。雖然這是哲學寓言文本，真實性存疑，但它說明了<strong>古中國已有對人形機械的系統性想像</strong>，並把「可拆解、可重組」視為機械與生命的根本差異。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>人形機械的最早文字記錄之一，提出「外觀如人，內部是機構」的核心矛盾</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">約 350 BCE · 古希臘</div>
+        <div class="civ-tl-title">Archytas 的蒸汽鴿子</div>
+        <div class="civ-tl-who">Archytas of Tarentum，數學家、政治家</div>
+        <div class="civ-tl-desc">塔倫托的 Archytas 據傳設計並建造了一隻木製鴿子，以蒸汽或壓縮空氣為動力，能在空中飛翔。這是有文字記載最早以<strong>外部動力源</strong>驅動的機械裝置，不再依賴人力或重力。同時期亞里斯多德在《政治學》中寫道：「如果機器能自行工作，奴隸制就沒有必要了」——這個思想在 2000 年後依然是機器人與勞動關係的核心命題。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>最早以動力源驅動的自主機械裝置；AI 取代勞動的哲學辯論起源</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">約 50–70 CE · 亞歷山卓</div>
+        <div class="civ-tl-title">Hero of Alexandria 的自動劇場</div>
+        <div class="civ-tl-who">Hero of Alexandria，工程師、數學家</div>
+        <div class="civ-tl-desc">Hero 記錄了超過 80 種機械裝置，其中最驚人的是<strong>全自動機械劇場</strong>：以繩索纏繞在旋轉鼓上的方式儲存「程式」，鼓轉動時依序觸發機關，讓演員移動、道具升降、甚至製造人工雷鳴閃電。他的蒸汽球（aeolipile）是人類第一台蒸汽機，比工業革命早了 1700 年。這個以<strong>旋轉鼓記錄指令序列</strong>的原理，與賈卡織機的打孔卡、現代 CPU 的指令集，在概念上一脈相承。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>「儲存程式控制機械行為」的最早實作；蒸汽動力概念的起源</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1088 CE · 中國北宋</div>
+        <div class="civ-tl-title">蘇頌的水運儀象台</div>
+        <div class="civ-tl-who">蘇頌，天文學家、工程師</div>
+        <div class="civ-tl-desc">宋代科學家蘇頌在開封建造高達 10 公尺的天文鐘塔，內建機械人偶每時辰敲鐘報時、拿牌報刻。關鍵技術是<strong>擒縱機構（escapement）</strong>——用水力驅動但以機械卡扣控制速率，讓時間測量從「流動的水」變成「可計數的離散單位」。擒縱機構後來傳入歐洲，成為機械鐘錶、工業機器調速器的核心原理，也是現代數位時鐘「時脈」概念的遠祖。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>擒縱機構是所有精密機械的計時核心；離散化時間控制的起源</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1206 CE · 伊斯蘭黃金時代</div>
+        <div class="civ-tl-title">Al-Jazari 的可程式化樂隊與大象鐘</div>
+        <div class="civ-tl-who">Ismail al-Jazari，工程師，被稱為「機器人學之父」</div>
+        <div class="civ-tl-desc">Al-Jazari 在《奇妙機械裝置知識之書》中記載了 50 種機械，包括：一艘載著<strong>四位機械音樂家的水上樂船</strong>——鼓手的節奏可透過更換旋轉鼓上的凸輪位置來改變，是人類歷史上最早的<strong>可程式化裝置</strong>之一；大象鐘整合了印度象、中國龍、波斯鳳凰、希臘水工、伊斯蘭月牙，象徵他融合各文明知識的自覺。他發明的曲軸（crankshaft）、凸輪機構（cam mechanism）至今仍是所有引擎和機器人關節的基礎元件。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>最早的可程式化機械；曲軸與凸輪機構是現代機器人傳動系統的直系祖先</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">約 1495 CE · 文藝復興義大利</div>
+        <div class="civ-tl-title">達文西的機械騎士</div>
+        <div class="civ-tl-who">Leonardo da Vinci，藝術家、工程師</div>
+        <div class="civ-tl-desc">達文西的筆記本（直到 1950 年代才被重新發現）中藏有完整的<strong>機械人形騎士設計圖</strong>：以外部曲柄驅動，透過纜線與滑輪讓騎士坐起、揮臂、轉頭、開合面罩。2002 年，NASA 工程師 Mark Rosheim 根據圖紙成功製作功能性複製品，驗證設計的可行性。達文西同時設計了自動獅子、自動撥弦樂器、自動戰車——他對「通用機械」（任何動作都能用相同機構原理實現）的直覺，正是今天人形機器人設計哲學的核心。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>第一個有完整工程設計圖的人形機器人概念；「通用機械」哲學的起源</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1662–1796 CE · 江戶日本</div>
+        <div class="civ-tl-title">Karakuri 機械人偶</div>
+        <div class="civ-tl-who">竹田近江、細川半藏等工匠；1796 年《機巧圖彙》</div>
+        <div class="civ-tl-desc">江戶時代工匠以彈簧、凸輪、鯨鬚為材料製作精密機械人偶，功能令人驚嘆：<strong>上茶娃娃</strong>（端茶走向客人、取回茶杯後折返）、<strong>射箭童子</strong>（取箭、搭弓、瞄準、射出）、<strong>書法人偶</strong>（可寫出四個漢字）。1796 年細川半藏出版《機巧圖彙》，完整記錄製作方法——這是日本第一本機械工程手冊。學者認為 Karakuri 的精密傳動美學，直接影響了現代日本在精密機械和機器人領域的文化基因。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>彈簧驅動精密傳動的最高峰；日本機器人文化的直接前身</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1739 CE · 法國</div>
+        <div class="civ-tl-title">Vaucanson 的「消化鴨」</div>
+        <div class="civ-tl-who">Jacques de Vaucanson，機械師</div>
+        <div class="civ-tl-desc">Vaucanson 的鍍金銅鴨是 18 世紀最轟動的工程展演：每個翅膀含<strong>超過 400 個零件</strong>，能拍打、戲水，從觀眾手中啄食穀粒，並排出預先儲存的「糞便」。雖然「消化」是障眼法，但 Vaucanson 因此引發了整個啟蒙時代最激烈的哲學辯論：<strong>機器能否真正模仿生命？人是不是一台更精密的機器？</strong>（笛卡兒的「動物機器論」）。他後來轉向工業，把程式化控制原理應用到紡織機——這直接啟發了賈卡提花機的發明。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>引發「機器能否模仿生命」的哲學辯論；程式化控制原理傳承給賈卡織機</em></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── PANEL: ENERGY ── -->
+  <div class="civ-panel" id="civp-energy" style="--tc:#00f080">
+    <div class="civ-tl">
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1769 · 英國</div>
+        <div class="civ-tl-title">瓦特改良蒸汽機</div>
+        <div class="civ-tl-who">James Watt，工程師</div>
+        <div class="civ-tl-desc">瓦特在 Newcomen 蒸汽機基礎上加入<strong>分離冷凝器</strong>，讓熱效率提升近四倍，蒸汽機從礦坑抽水泵進化為通用動力源。關鍵創新不只是效率——他發明的<strong>離心調速器（centrifugal governor）</strong>讓機器能自動維持穩定轉速，這是第一個實用的<strong>閉迴路回饋控制系統</strong>，也是現代 PID 控制器、機器人關節伺服系統的直系祖先。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>第一個實用通用動力源；離心調速器是閉迴路控制系統的起源</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1831 · 英國</div>
+        <div class="civ-tl-title">法拉第電磁感應定律</div>
+        <div class="civ-tl-who">Michael Faraday，物理學家</div>
+        <div class="civ-tl-desc">法拉第發現變化的磁場能在導體中產生電流（電磁感應），以及通電導體在磁場中受力（電動機原理）。這兩個發現奠定了<strong>所有電動機的理論基礎</strong>。在此之前，動力只能靠蒸汽、人力、畜力——法拉第讓「電能轉換為機械運動」成為可能，是機器人關節從液壓走向電驅的根本前提。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>電動機的理論基礎；讓機器人關節可以「用電控制力矩」</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1888 · 美國</div>
+        <div class="civ-tl-title">特斯拉交流電感應馬達</div>
+        <div class="civ-tl-who">Nikola Tesla，工程師、發明家</div>
+        <div class="civ-tl-desc">Tesla 發明旋轉磁場原理與交流感應馬達，配合 Westinghouse 的交流電力系統，讓電力能遠距傳輸並在工廠就地轉換為旋轉動力。現代機器人使用的<strong>BLDC（無刷直流馬達）</strong>雖然用直流電，但其三相驅動原理直接源自 Tesla 的旋轉磁場概念。沒有 Tesla 的貢獻，今天機器人關節裡的精密伺服馬達就不存在。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>現代 BLDC 伺服馬達的理論前身；讓電力驅動普及化</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1940s–1960s</div>
+        <div class="civ-tl-title">液壓技術的成熟</div>
+        <div class="civ-tl-who">航空與軍事工業推動</div>
+        <div class="civ-tl-desc">二戰後，飛機操控面、坦克炮塔、重型建機的需求推動液壓系統走向精密化。液壓致動器的<strong>功率重量比</strong>（power-to-weight ratio）遠超同期電動馬達，Boston Dynamics 的 BigDog 和早期 Atlas 都以液壓為動力，才能在承載自重的同時輸出足夠大的關節力矩。液壓系統的缺點是洩漏、噪音、低效率——這正是促使下一代機器人全面轉向電驅的原因。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>高功率密度讓早期足式機器人成真；其限制推動了電驅馬達的技術競賽</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1991 · 日本 Sony</div>
+        <div class="civ-tl-title">鋰離子電池商業化</div>
+        <div class="civ-tl-who">Yoshino Akira（吉野彰）團隊；2019 年諾貝爾化學獎</div>
+        <div class="civ-tl-desc">Sony 推出全球第一款商用鋰離子電池，能量密度比鎳鎘電池高出一倍、重量更輕、無記憶效應。<strong>這是移動機器人真正可行的關鍵節點</strong>——在此之前，機器人要嘛插電運作、要嘛電池太重。鋰電池讓機器人可以離線自主移動數小時，是 ASIMO、波士頓動力 Spot 乃至 Tesla Optimus 全都依賴的能源基礎。吉野彰於 2019 年獲頒諾貝爾化學獎。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>讓移動機器人脫離電線束縛；現代人形機器人的標準電源</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">2000s</div>
+        <div class="civ-tl-title">BLDC 無刷直流馬達普及</div>
+        <div class="civ-tl-who">台達電、FANUC 等廠商推動</div>
+        <div class="civ-tl-desc">有刷馬達靠碳刷導電、磨損快、有火花；BLDC 改以電子換向，效率更高、壽命更長、可精確控制力矩。搭配<strong>場向導控制（FOC，Field-Oriented Control）</strong>算法，BLDC 能在每個電角度精確輸出力矩，讓機器人關節的「力控模式」成為可能——這正是觸覺感測、柔順控制、安全人機協作的硬體基礎。台灣台達電是全球主要 AC 伺服系統供應商之一。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>力矩精確控制讓柔順操作成真；台灣廠商在全球供應鏈中扮演關鍵角色</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">2020s</div>
+        <div class="civ-tl-title">全固態電池競賽</div>
+        <div class="civ-tl-who">Toyota、Samsung SDI、輝能科技等</div>
+        <div class="civ-tl-desc">固態電池以固體電解質取代液態電解液，能量密度可達 350–500 Wh/kg（鋰電池的 2–3 倍），同時安全性更高、工作溫度範圍更廣（-30°C 至 60°C）。預計 2030–2035 年大規模商業化，將讓人形機器人的連續工作時間從 4–8 小時躍升至一整個工作天。台灣新創<strong>輝能科技（Prologium）</strong>是全球固態電池技術領先廠商之一。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>下一代人形機器人「全天候工作」的能源關鍵</em></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── PANEL: COMPUTER ── -->
+  <div class="civ-panel" id="civp-computer" style="--tc:#00d4ff">
+    <div class="civ-tl">
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1801 · 法國</div>
+        <div class="civ-tl-title">賈卡提花織機</div>
+        <div class="civ-tl-who">Joseph Marie Jacquard，工匠</div>
+        <div class="civ-tl-desc">Jacquard 用<strong>打孔卡片</strong>控制織布機的提花圖案——有孔 = 讓線穿過（1），無孔 = 擋住（0）。這是人類歷史上第一次用<strong>外部儲存的指令序列</strong>控制機器行為，「程式」的概念就此誕生。Charles Babbage 看到織機後直接把打孔卡引入他的分析機設計；IBM 的打孔卡一直用到 1970 年代；現代 CPU 的指令集，本質上是這個概念的電子化版本。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>「程式」概念的起源；打孔卡 → Babbage → IBM → 現代電腦的直接傳承</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1837–1843 · 英國</div>
+        <div class="civ-tl-title">Babbage 分析機 與 Ada Lovelace</div>
+        <div class="civ-tl-who">Charles Babbage 設計；Ada Lovelace 撰寫演算法</div>
+        <div class="civ-tl-desc">Babbage 設計了概念上完整的<strong>通用計算機</strong>——有輸入（打孔卡）、儲存（齒輪記憶體）、處理器（差分引擎）、輸出，只是以蒸汽驅動、從未完整建成。數學家 Ada Lovelace 為分析機撰寫了計算白努利數的完整算法，被認為是<strong>史上第一位程式設計師</strong>。她在筆記中預見機器能處理「任何可符號化的事物」，包括音樂——比圖靈機早了近一個世紀。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>通用計算機概念的起源；「程式設計」作為一門知識的誕生</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1936 · 英國</div>
+        <div class="civ-tl-title">圖靈機與可計算性理論</div>
+        <div class="civ-tl-who">Alan Turing，數學家</div>
+        <div class="civ-tl-desc">Turing 在論文《論可計算數》中提出「圖靈機」——一個抽象的讀寫頭在無限長紙帶上移動的模型，能模擬任何算法。這個概念回答了「什麼問題電腦能解決、什麼不能」，奠定了整個電腦科學的理論基礎。1950 年他提出<strong>「圖靈測試」</strong>：如果機器的對話讓人分不清是人是機器，就可以說機器「能思考」——這個問題在 ChatGPT 出現後有了全新意義。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>定義「可計算性」邊界；圖靈測試是 AI 能力評估的原始框架</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1947 · 美國 Bell Labs</div>
+        <div class="civ-tl-title">電晶體的發明</div>
+        <div class="civ-tl-who">Shockley、Bardeen、Brattain；1956 年諾貝爾物理獎</div>
+        <div class="civ-tl-desc">第一個電晶體（點接觸型）在 Bell Labs 誕生。電晶體用半導體材料取代真空管，體積縮小千倍、功耗降低、壽命延長、可靠性大幅提升。ENIAC 電腦需要一整棟建築和 18,000 個真空管；電晶體讓電腦縮小到可以裝進機器人的身體。<strong>今天一顆 3nm 晶片上可以集成 1,700 億個電晶體</strong>——機器人的嵌入式 AI 推理才成為可能。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>讓電腦從房間縮小到晶片；機器人「大腦」小型化的根本前提</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1958 · 美國</div>
+        <div class="civ-tl-title">積體電路（IC）</div>
+        <div class="civ-tl-who">Jack Kilby（Texas Instruments）；2000 年諾貝爾物理獎</div>
+        <div class="civ-tl-desc">Kilby 把電晶體、電阻、電容全部整合到一片半導體基板上，製成第一個積體電路。這讓電腦從「分立元件手工焊接」走向「批量製造的晶片」，成本暴跌、可靠性躍升。IC 是<strong>嵌入式系統</strong>的前提——沒有 IC 就沒有 Arduino、Raspberry Pi、NVIDIA Jetson，機器人控制器就不可能整合進機身。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>嵌入式控制器的硬體基礎；機器人「大腦」批量製造成為可能</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1969 · 美國 Stanford Research Institute</div>
+        <div class="civ-tl-title">Shakey — 第一台 AI 控制的移動機器人</div>
+        <div class="civ-tl-who">SRI International，DARPA 資助</div>
+        <div class="civ-tl-desc">Shakey 是第一台把<strong>感知（攝影機）、推理（電腦規劃）、行動（輪式移動）</strong>整合在一起的機器人，雖然每個動作需要幾分鐘計算，但它第一次讓「機器人自己決定下一步怎麼走」成為現實。Shakey 開發出的 A* 搜尋算法至今仍是機器人路徑規劃的基礎；它所確立的<strong>感知—規劃—執行（Sense-Plan-Act）</strong>架構，是所有現代自主機器人系統的基本框架。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>Sense-Plan-Act 架構的起源；A* 路徑規劃算法的誕生地</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1971 · 美國 Intel</div>
+        <div class="civ-tl-title">Intel 4004 — 第一顆商用微處理器</div>
+        <div class="civ-tl-who">Federico Faggin、Ted Hoff、Stan Mazor</div>
+        <div class="civ-tl-desc">Intel 4004 把 CPU 的所有功能整合到單一晶片，運算能力與 1946 年的 ENIAC 相當，但體積是指甲蓋大小、售價 200 美元。微處理器讓「每台機器都有自己的大腦」成為可能——機器人控制器從專用電腦走向通用晶片，<strong>嵌入式系統</strong>的時代正式開啟。今天機器人關節的伺服驅動器、感測器融合模組，都是微處理器普及化的直接產物。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>嵌入式控制器普及化的起點；每個關節都能有自己的 CPU</em></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── PANEL: AI ── -->
+  <div class="civ-panel" id="civp-ai" style="--tc:#b060ff">
+    <div class="civ-tl">
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1943 · 美國</div>
+        <div class="civ-tl-title">人工神經元的數學模型</div>
+        <div class="civ-tl-who">Warren McCulloch & Walter Pitts</div>
+        <div class="civ-tl-desc">McCulloch 和 Pitts 用數學證明，<strong>神經元的開/關行為可以用布林邏輯（AND、OR、NOT）描述</strong>，並提出人工神經元模型。這是第一次把「大腦的思考」轉化為可計算的數學結構，也是今天深度學習的遠祖。80 年後，機器人的視覺感知、語言理解、步態控制，都跑在以這個模型為基礎的神經網路上。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>深度學習的數學起源；「大腦可以被計算模擬」這個命題的首次形式化</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1956 · 美國達特茅斯學院</div>
+        <div class="civ-tl-title">AI 正式命名：達特茅斯會議</div>
+        <div class="civ-tl-who">John McCarthy、Marvin Minsky、Claude Shannon 等</div>
+        <div class="civ-tl-desc">這場為期兩個月的夏季研討會，McCarthy 首次提出「<strong>人工智慧（Artificial Intelligence）</strong>」這個詞，確立了 AI 作為獨立研究領域的地位。與會者雄心萬丈：相信機器的智能可以在一個夏天被「精確描述並模擬」。這個樂觀主義推動了大量研究資金投入，也埋下後來「AI 寒冬」的伏筆——當現實沒有跟上期待，資金就會撤退。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>AI 研究領域的正式誕生；過度樂觀與現實落差的循環第一次開始</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1974 & 1987 · 全球</div>
+        <div class="civ-tl-title">兩次 AI 寒冬</div>
+        <div class="civ-tl-who">Lighthill 報告（英國，1973）；連結主義批評（1987）</div>
+        <div class="civ-tl-desc">1974 年，英國 Lighthill 報告批評 AI 研究誇大成果、缺乏實際進展，英美政府大幅削減資助，第一次 AI 寒冬開始。1987 年，專家系統（符號 AI）的高維護成本讓企業失去興趣，第二次寒冬降臨。兩次寒冬的共同原因：<strong>計算能力不足 + 資料量太少 + 算法不夠強</strong>。這三個瓶頸直到 2010 年代同時突破，才讓 AI 真正起飛——這也說明為什麼「時機」在科技發展中同樣重要。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>說明技術發展的「充要條件」：算法、算力、資料，缺一不可</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1986 · 美國</div>
+        <div class="civ-tl-title">反向傳播算法（Backpropagation）</div>
+        <div class="civ-tl-who">Rumelhart、Hinton、Williams</div>
+        <div class="civ-tl-desc">反向傳播讓多層神經網路真正可訓練：<strong>從輸出誤差往回計算每個權重對誤差的貢獻，用梯度下降逐步調整</strong>。這個算法本身在 1970 年代就有人提出，但 Rumelhart 等人的論文讓它廣為人知並被大規模應用。問題是 1986 年的電腦算力太弱、訓練資料太少，神經網路只能有兩三層——要等到 GPU 和大數據出現，反向傳播的全部潛力才爆發。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>深度學習的算法核心；2012 年 AlexNet 爆發的理論引信</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">1997 · 美國</div>
+        <div class="civ-tl-title">Deep Blue 擊敗西洋棋世界冠軍</div>
+        <div class="civ-tl-who">IBM Deep Blue vs. Garry Kasparov</div>
+        <div class="civ-tl-desc">IBM 的 Deep Blue 以 3.5 比 2.5 擊敗世界冠軍 Kasparov，成為第一台在正式比賽中擊敗人類頂尖棋手的電腦。雖然 Deep Blue 用的是暴力搜索而非「真正的智能」，但這場勝利<strong>改變了全球公眾對 AI 能力的認知</strong>，重新吸引學術界和企業的大量投入。更重要的是：它說明了「對特定任務進行優化的機器可以超越人類」，這個命題後來延伸到視覺（AlexNet）、語言（GPT）、機器人操作（AlphaCode 等）。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>AI 第一次在公眾視野中超越人類頂尖專家；重新定義 AI 能力的社會預期</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">2017 · Google Brain</div>
+        <div class="civ-tl-title">Transformer 架構</div>
+        <div class="civ-tl-who">Vaswani 等人，論文《Attention Is All You Need》</div>
+        <div class="civ-tl-desc">Transformer 用<strong>自注意力機制（Self-Attention）</strong>取代 RNN 的循環結構，讓模型能一次看到整個輸入序列中每個位置與其他位置的關係。這讓模型規模可以無限擴大、訓練可以高度並行，直接催生了 GPT、BERT 等大型語言模型。對機器人的影響是：<strong>具身大型語言模型（Embodied LLM）</strong>讓機器人能理解自然語言指令，把「幫我整理桌子」自動拆解為可執行的動作序列——這是 2025 年最熱門的機器人研究方向。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>LLM 的技術基礎；讓機器人能理解自然語言高階指令</em></div>
+      </div>
+
+      <div class="civ-tl-item">
+        <div class="civ-tl-dot"></div>
+        <div class="civ-tl-year">2022 · OpenAI</div>
+        <div class="civ-tl-title">ChatGPT 引爆具身智能時代</div>
+        <div class="civ-tl-who">OpenAI GPT-3.5 → GPT-4</div>
+        <div class="civ-tl-desc">ChatGPT 在兩個月內突破 1 億用戶，讓全世界第一次親身體驗到大型語言模型的能力。對機器人領域的衝擊是直接的：研究者開始把 LLM 嵌入機器人系統，讓機器人能接受模糊的高階目標（「幫我泡茶」）並自動規劃動作序列。2025 年發表於《Nature Machine Intelligence》的研究確認，<strong>具身 LLM 能在真實環境中完成複雜任務並動態調整計畫</strong>。語言理解和物理執行的結合，被認為是通用人形機器人的最後一塊拼圖。</div>
+        <div class="civ-tl-impact">對機器人的意義：<em>具身智能研究的爆發點；LLM 讓機器人真正能「聽懂人話並行動」</em></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /pg-civ -->
+
+<!-- ══ PAGE: FUTURE ══ -->
+<div id="pg-future" class="page">
+  <div class="fut-hero">
+    <h1>機器人<span>未來展望</span></h1>
+    <p>接下來十到三十年，機器人將突破哪些邊界？這些方向正是今天高中生可以投身的領域。</p>
+  </div>
+
+  <div class="fut-horizon-section">
+    <div class="fut-h-title">近期 2025–2030 &nbsp;|&nbsp; 技術已存在，等待規模化</div>
+    <div class="fut-grid">
+      <div class="fut-card" style="--fc:#00d4ff">
+        <div class="fut-icon">🏭</div>
+        <div class="fut-horizon">2025 – 2028</div>
+        <div class="fut-title">工廠通用工人</div>
+        <div class="fut-desc">人形機器人取代高重複性、高危險的製造業人力。Tesla Optimus、Figure 01 預計 2026 年在自家工廠量產部署，執行裝配、搬運、品質檢測。台灣供應鏈（上銀減速機、台達馬達）將成關鍵。</div>
+        <div class="fut-tags"><span class="fut-tag">製造自動化</span><span class="fut-tag">供應鏈整合</span><span class="fut-tag">人機協作</span></div>
+      </div>
+      <div class="fut-card" style="--fc:#00f080">
+        <div class="fut-icon">🏥</div>
+        <div class="fut-horizon">2026 – 2030</div>
+        <div class="fut-title">醫療照護助手</div>
+        <div class="fut-desc">高齡社會照護需求缺口巨大。機器人將協助翻身、移位、送餐、監測生命跡象，搭配 LLM 進行日常對話陪伴。日本已有多款護理機器人試點，台灣長照體系同步跟進。</div>
+        <div class="fut-tags"><span class="fut-tag">長照機器人</span><span class="fut-tag">觸覺感測</span><span class="fut-tag">情緒辨識</span></div>
+      </div>
+      <div class="fut-card" style="--fc:#ff8c42">
+        <div class="fut-icon">🏗️</div>
+        <div class="fut-horizon">2027 – 2030</div>
+        <div class="fut-title">建築與災難救援</div>
+        <div class="fut-desc">崎嶇地形行走能力成熟後，機器人將進入倒塌建物搜救、高空焊接、核電廠維修等危險場域。足式機器人搭配機械臂已在廢核電廠完成初步試驗。</div>
+        <div class="fut-tags"><span class="fut-tag">災難搜救</span><span class="fut-tag">極端環境</span><span class="fut-tag">遠端操控</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fut-horizon-section">
+    <div class="fut-h-title">中期 2030–2040 &nbsp;|&nbsp; 需要突破的關鍵技術</div>
+    <div class="fut-grid">
+      <div class="fut-card" style="--fc:#b060ff">
+        <div class="fut-icon">🧠</div>
+        <div class="fut-horizon">2030 – 2038</div>
+        <div class="fut-title">具身通用智能</div>
+        <div class="fut-desc">機器人不再需要針對每個任務重新訓練。結合大型世界模型（World Model），能理解模糊指令並自行規劃執行步驟。核心挑戰是將 LLM 的語言推理接地到物理世界。</div>
+        <div class="fut-tags"><span class="fut-tag">World Model</span><span class="fut-tag">Zero-shot 泛化</span><span class="fut-tag">常識推理</span></div>
+      </div>
+      <div class="fut-card" style="--fc:#ffd060">
+        <div class="fut-icon">⚡</div>
+        <div class="fut-horizon">2030 – 2040</div>
+        <div class="fut-title">全固態電池 × 人工肌肉</div>
+        <div class="fut-desc">現有鋰電池能量密度 150–250 Wh/kg，限制工作時間。全固態電池透過固體電解質，能量密度可達 350–500 Wh/kg（約 2–3 倍），安全性更高、工作溫度範圍更廣（-30°C 至 60°C），預計 2030–2035 年商業化。介電彈性體人工肌肉若取代馬達，可讓機器人更輕、更柔、無機械噪音。</div>
+        <div class="fut-tags"><span class="fut-tag">固態電池</span><span class="fut-tag">軟性機器人</span><span class="fut-tag">人工肌肉</span></div>
+      </div>
+      <div class="fut-card" style="--fc:#ff5588">
+        <div class="fut-icon">🤝</div>
+        <div class="fut-horizon">2032 – 2040</div>
+        <div class="fut-title">群體協作與社會整合</div>
+        <div class="fut-desc">多台機器人在同一空間協同作業，動態分配任務、避免碰撞。更大的挑戰是倫理：當機器人進入家庭、學校、醫院，安全邊界、責任歸屬、隱私保護將與工程技術同等重要。</div>
+        <div class="fut-tags"><span class="fut-tag">多機協作</span><span class="fut-tag">機器人倫理</span><span class="fut-tag">社會整合</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fut-horizon-section">
+    <div class="fut-h-title">遠期 2040+ &nbsp;|&nbsp; 想像力的邊界</div>
+    <div class="fut-grid">
+      <div class="fut-card" style="--fc:#00d4ff">
+        <div class="fut-icon">🚀</div>
+        <div class="fut-horizon">2040+</div>
+        <div class="fut-title">太空建設與星際探索</div>
+        <div class="fut-desc">在月球或火星上，人形機器人先於人類抵達，建造基地、鋪設電力系統、執行地質探勘。NASA Valkyrie、ESA 機器人太空人計畫正是這條路線的前期工程。</div>
+        <div class="fut-tags"><span class="fut-tag">太空機器人</span><span class="fut-tag">自主建造</span><span class="fut-tag">極端環境</span></div>
+      </div>
+      <div class="fut-card" style="--fc:#00f080">
+        <div class="fut-icon">🧬</div>
+        <div class="fut-horizon">2040+</div>
+        <div class="fut-title">生物混合機器人</div>
+        <div class="fut-desc">將活體肌肉、神經細胞與機械骨架結合，創造能自我修復、消耗極低能量的生機電系統。已有研究以青蛙皮膚細胞培養出可游泳的 Xenobot，這是軟性機器人的下一代方向。</div>
+        <div class="fut-tags"><span class="fut-tag">生機電整合</span><span class="fut-tag">自癒材料</span><span class="fut-tag">合成生物學</span></div>
+      </div>
+      <div class="fut-card" style="--fc:#ffd060">
+        <div class="fut-icon">💡</div>
+        <div class="fut-horizon">2040+</div>
+        <div class="fut-title">腦機介面與數位孿生</div>
+        <div class="fut-desc">腦機介面（BCI）讓人類以意念操控機器人，實現遠端臨場感。結合數位孿生，在虛擬環境即時模擬機器人每個決策，再同步至實體執行。</div>
+        <div class="fut-tags"><span class="fut-tag">腦機介面</span><span class="fut-tag">數位孿生</span><span class="fut-tag">遠端臨場</span></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /pg-future -->
+
+<!-- ══ PAGE: APPS ══ -->
+<div id="pg-apps" class="page">
+
+  <div class="apps-hero">
+    <h1>機器人<em>十大現況應用</em></h1>
+    <p>截至 2024–2025 年，人形與特殊用途機器人已在這十個領域真實部署。<br>每個領域都有它獨特的技術挑戰與台灣的切入機會。</p>
+    <div class="apps-counter">
+      <div class="apps-counter-item"><span class="apps-counter-num">10</span><div class="apps-counter-lbl">應用領域</div></div>
+      <div class="apps-counter-item"><span class="apps-counter-num">50+</span><div class="apps-counter-lbl">代表企業</div></div>
+      <div class="apps-counter-item"><span class="apps-counter-num">2024</span><div class="apps-counter-lbl">資料年份</div></div>
+    </div>
+  </div>
+
+  <div class="apps-grid" id="apps-grid"></div>
+
+</div><!-- /pg-apps -->
+
+<!-- ══ PAGE: REFS ══ -->
+<div id="pg-refs" class="page">
+  <div class="refs-hero">
+    <h1>📎 <em>參考資料</em></h1>
+    <p>本網站內容整合自國際學術論文、產業白皮書與技術文件，共引用 109 筆資料。<br>
+    點擊任一條目可直接前往原始來源。資料截止日期：2025–2026 年。</p>
+  </div>
+  <div class="refs-body">
+
+    <div class="refs-section">
+      <div class="refs-section-title">定義與總覽 <span class="refs-count">5</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://www.dobot-robots.com/insights/news/what-is-a-humanoid-robot-definition-capabilities-and-industrial-reality.html" target="_blank">
+          <div class="ref-num">[1]</div><div><div class="ref-title">What Is a Humanoid Robot? Definition, Capabilities, and Industrial Reality</div><div class="ref-source">Dobot, 2025</div><div class="ref-url">dobot-robots.com/insights/news/what-is-a-humanoid-robot…</div></div>
+        </a>
+        <a class="ref-card" href="https://en.wikipedia.org/wiki/Humanoid_robot" target="_blank">
+          <div class="ref-num">[2]</div><div><div class="ref-title">Humanoid robot</div><div class="ref-source">Wikipedia</div><div class="ref-url">en.wikipedia.org/wiki/Humanoid_robot</div></div>
+        </a>
+        <a class="ref-card" href="https://www.nvidia.com/en-gb/glossary/humanoid-robot/" target="_blank">
+          <div class="ref-num">[3]</div><div><div class="ref-title">What is a Humanoid Robot?</div><div class="ref-source">NVIDIA, 2025</div><div class="ref-url">nvidia.com/en-gb/glossary/humanoid-robot/</div></div>
+        </a>
+        <a class="ref-card" href="https://www.nvidia.com/en-us/glossary/humanoid-robot/" target="_blank">
+          <div class="ref-num">[4]</div><div><div class="ref-title">What are Humanoid Robots and Why do They Matter?</div><div class="ref-source">NVIDIA, 2025</div><div class="ref-url">nvidia.com/en-us/glossary/humanoid-robot/</div></div>
+        </a>
+        <a class="ref-card" href="https://blog.robozaps.com/b/what-is-a-humanoid" target="_blank">
+          <div class="ref-num">[5]</div><div><div class="ref-title">What Is a Humanoid Robot? [2026 Guide]</div><div class="ref-source">Robozaps, 2026</div><div class="ref-url">blog.robozaps.com/b/what-is-a-humanoid</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">視覺感測與 AI <span class="refs-count">6</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://roboflow.com/model/yolov8" target="_blank">
+          <div class="ref-num">[6]</div><div><div class="ref-title">YOLOv8 Object Detection Model: What is, How to Use</div><div class="ref-source">Roboflow, 2023</div><div class="ref-url">roboflow.com/model/yolov8</div></div>
+        </a>
+        <a class="ref-card" href="https://huggingface.co/Ultralytics/YOLOv8" target="_blank">
+          <div class="ref-num">[7]</div><div><div class="ref-title">Ultralytics/YOLOv8</div><div class="ref-source">Hugging Face, 2024</div><div class="ref-url">huggingface.co/Ultralytics/YOLOv8</div></div>
+        </a>
+        <a class="ref-card" href="https://docs.ultralytics.com/models/yolov8/" target="_blank">
+          <div class="ref-num">[8]</div><div><div class="ref-title">Explore Ultralytics YOLOv8</div><div class="ref-source">Ultralytics, 2026</div><div class="ref-url">docs.ultralytics.com/models/yolov8/</div></div>
+        </a>
+        <a class="ref-card" href="https://www.nature.com/articles/s42256-025-01005-x" target="_blank">
+          <div class="ref-num">[9]</div><div><div class="ref-title">Embodied large language models enable robots to complete complex tasks in natural environments</div><div class="ref-source">Nature Machine Intelligence, 2025</div><div class="ref-url">nature.com/articles/s42256-025-01005-x</div></div>
+        </a>
+        <a class="ref-card" href="https://arxiv.org/html/2311.15649v2" target="_blank">
+          <div class="ref-num">[10]</div><div><div class="ref-title">RoboGPT: an LLM-based Embodied Long-term Decision Making Framework</div><div class="ref-source">arXiv, 2024</div><div class="ref-url">arxiv.org/html/2311.15649v2</div></div>
+        </a>
+        <a class="ref-card" href="https://openaccess.thecvf.com/content/ICCV2023/papers/Song_LLM-Planner_Few-Shot_Grounded_Planning_for_Embodied_Agents_with_Large" target="_blank">
+          <div class="ref-num">[11]</div><div><div class="ref-title">LLM-Planner: Few-Shot Grounded Planning for Embodied Agents with LLMs</div><div class="ref-source">ICCV, 2023</div><div class="ref-url">openaccess.thecvf.com/content/ICCV2023/…LLM-Planner…</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">IMU 與感測器融合 <span class="refs-count">2</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="http://peichunlin.me.ntu.edu.tw/homepage/research/Publication/2009_ICRA.pdf" target="_blank">
+          <div class="ref-num">[12]</div><div><div class="ref-title">Design and Implementation of a 9-Axis Inertial Measurement Unit</div><div class="ref-source">National Taiwan University, 2009</div><div class="ref-url">peichunlin.me.ntu.edu.tw/…/2009_ICRA.pdf</div></div>
+        </a>
+        <a class="ref-card" href="https://www.lp-research.com/products/inertial-measurement-units-imu/lpms-ig1w/" target="_blank">
+          <div class="ref-num">[13]</div><div><div class="ref-title">LPMS-IG1W: 9-Axis IMU</div><div class="ref-source">LP Research, 2026</div><div class="ref-url">lp-research.com/products/…/lpms-ig1w/</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">電池與電源系統 <span class="refs-count">6</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://en.wikipedia.org/wiki/Solid-state_battery" target="_blank">
+          <div class="ref-num">[14]</div><div><div class="ref-title">Solid-state battery</div><div class="ref-source">Wikipedia</div><div class="ref-url">en.wikipedia.org/wiki/Solid-state_battery</div></div>
+        </a>
+        <a class="ref-card" href="https://www.laserax.com/blog/solid-state-vs-lithium-ion-batteries" target="_blank">
+          <div class="ref-num">[15]</div><div><div class="ref-title">Solid State Batteries Vs. Lithium-Ion: Which One is Better?</div><div class="ref-source">Laserax, 2024</div><div class="ref-url">laserax.com/blog/solid-state-vs-lithium-ion-batteries</div></div>
+        </a>
+        <a class="ref-card" href="https://www.anernstore.com/blogs/diy-solar-guides/solid-state-battery-density-guide" target="_blank">
+          <div class="ref-num">[16]</div><div><div class="ref-title">Solid-State vs. Lithium-Ion: A Comprehensive Energy Density Guide</div><div class="ref-source">Anern Store, 2025</div><div class="ref-url">anernstore.com/blogs/…/solid-state-battery-density-guide</div></div>
+        </a>
+        <a class="ref-card" href="https://www.ecoflow.com/us/blog/solid-state-batteries-energy-density-safety-fast-charging" target="_blank">
+          <div class="ref-num">[17]</div><div><div class="ref-title">Solid-State Batteries: Energy Density, Safety & Fast Charging</div><div class="ref-source">EcoFlow, 2026</div><div class="ref-url">ecoflow.com/us/blog/solid-state-batteries-energy-density…</div></div>
+        </a>
+        <a class="ref-card" href="https://www.alsym.com/blog/solid-state-battery-vs-lithium-ion/" target="_blank">
+          <div class="ref-num">[99]</div><div><div class="ref-title">Solid-State Battery vs Lithium-Ion: What's the Difference?</div><div class="ref-source">Alsym, 2025</div><div class="ref-url">alsym.com/blog/solid-state-battery-vs-lithium-ion/</div></div>
+        </a>
+        <a class="ref-card" href="https://www.therobotreport.com/unitree-robotics-unveils-g1-humanoid-for-16k/" target="_blank">
+          <div class="ref-num">[21]</div><div><div class="ref-title">Unitree Robotics unveils G1 humanoid for $16K</div><div class="ref-source">The Robot Report, 2024</div><div class="ref-url">therobotreport.com/unitree-robotics-unveils-g1-humanoid-for-16k/</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">ROS 2 與系統架構 <span class="refs-count">3</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://www.mathworks.com/help/ros/gs/robot-operating-system-ros2-basic-concepts.html" target="_blank">
+          <div class="ref-num">[18]</div><div><div class="ref-title">Introduction to Robot Operating System 2 (ROS 2)</div><div class="ref-source">MathWorks, 2024</div><div class="ref-url">mathworks.com/help/ros/gs/robot-operating-system-ros2…</div></div>
+        </a>
+        <a class="ref-card" href="https://www.theconstruct.ai/ros2-how-to-ros2-topics-vs-services-vs-actions-5/" target="_blank">
+          <div class="ref-num">[19]</div><div><div class="ref-title">ROS2 Topics vs Services vs Actions</div><div class="ref-source">The Construct, 2022</div><div class="ref-url">theconstruct.ai/ros2-how-to-ros2-topics-vs-services-vs-actions-5/</div></div>
+        </a>
+        <a class="ref-card" href="https://docs.ros.org/en/iron/How-To-Guides/Topics-Services-Actions.html" target="_blank">
+          <div class="ref-num">[20]</div><div><div class="ref-title">Topics vs Services vs Actions — ROS 2 Documentation</div><div class="ref-source">ROS 2 Docs</div><div class="ref-url">docs.ros.org/en/iron/How-To-Guides/Topics-Services-Actions.html</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">台灣供應鏈（上銀・台達） <span class="refs-count">6</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://deltathailand.com/en/products/Automation/Industrial-Automation/2" target="_blank">
+          <div class="ref-num">[22]</div><div><div class="ref-title">Motion Products — Delta Electronics</div><div class="ref-source">Delta Electronics Thailand</div><div class="ref-url">deltathailand.com/en/products/Automation/Industrial-Automation/2</div></div>
+        </a>
+        <a class="ref-card" href="https://www.taiwanexcellence.org/en/award/product/27438" target="_blank">
+          <div class="ref-num">[23]</div><div><div class="ref-title">Articulated Robot — Delta Electronics</div><div class="ref-source">Taiwan Excellence</div><div class="ref-url">taiwanexcellence.org/en/award/product/27438</div></div>
+        </a>
+        <a class="ref-card" href="https://www.deltaww.com/en-US/products/industrial-automation" target="_blank">
+          <div class="ref-num">[24]</div><div><div class="ref-title">Products — Industrial Automation</div><div class="ref-source">Delta Electronics, 2026</div><div class="ref-url">deltaww.com/en-US/products/industrial-automation</div></div>
+        </a>
+        <a class="ref-card" href="https://english.cw.com.tw/article/article.action?id=4289" target="_blank">
+          <div class="ref-num">[25]</div><div><div class="ref-title">Hiwin Technologies Builds Joints for Futuristic Humanoid Robots</div><div class="ref-source">CommonWealth Magazine, 2025</div><div class="ref-url">english.cw.com.tw/article/article.action?id=4289</div></div>
+        </a>
+        <a class="ref-card" href="https://www.taiwannews.com.tw/news/6242014" target="_blank">
+          <div class="ref-num">[26]</div><div><div class="ref-title">Taiwan's Hiwin to launch production of logistics robots by 2026</div><div class="ref-source">Taiwan News, 2025</div><div class="ref-url">taiwannews.com.tw/news/6242014</div></div>
+        </a>
+        <a class="ref-card" href="https://www.directindustry.com/product-manufacturer/hiwin-robot-gear-reducer-148444-34687.html" target="_blank">
+          <div class="ref-num">[27]</div><div><div class="ref-title">HIWIN Robot gear reducers</div><div class="ref-source">DirectIndustry, 2024</div><div class="ref-url">directindustry.com/product-manufacturer/hiwin-robot-gear-reducer…</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">力感測與觸覺 <span class="refs-count">4</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://en.hypersen.com/application/six-axis-force-torque-sensors-the-force-sensing-technology-for-humanoid-robots/" target="_blank">
+          <div class="ref-num">[28]</div><div><div class="ref-title">Six-axis Force Torque Sensors — The Force Sensing Technology for Humanoid Robots</div><div class="ref-source">Hypersen Technology, 2025</div><div class="ref-url">en.hypersen.com/application/six-axis-force-torque-sensors…</div></div>
+        </a>
+        <a class="ref-card" href="https://onrobot.com/en/products/hex-6-axis-force-torque-sensor" target="_blank">
+          <div class="ref-num">[29]</div><div><div class="ref-title">Hex 6-Axis Force Torque Sensor</div><div class="ref-source">OnRobot</div><div class="ref-url">onrobot.com/en/products/hex-6-axis-force-torque-sensor</div></div>
+        </a>
+        <a class="ref-card" href="https://www.nature.com/articles/s41467-023-42722-4" target="_blank">
+          <div class="ref-num">[33]</div><div><div class="ref-title">A robotic sensory system with high spatiotemporal resolution for texture recognition</div><div class="ref-source">Nature Communications, 2023</div><div class="ref-url">nature.com/articles/s41467-023-42722-4</div></div>
+        </a>
+        <a class="ref-card" href="https://bdml.stanford.edu/pmwiki/pmwiki.php/Main/TactileSensing" target="_blank">
+          <div class="ref-num">[34]</div><div><div class="ref-title">Tactile Sensing</div><div class="ref-source">Stanford BDML</div><div class="ref-url">bdml.stanford.edu/…/Main/TactileSensing</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">步態控制與強化學習 <span class="refs-count">5</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://www.hrl.uni-bonn.de/papers/koenemann15iros.pdf" target="_blank">
+          <div class="ref-num">[35]</div><div><div class="ref-title">Whole-Body Model-Predictive Control Applied to the HRP-2 Humanoid</div><div class="ref-source">University of Bonn, 2015</div><div class="ref-url">hrl.uni-bonn.de/papers/koenemann15iros.pdf</div></div>
+        </a>
+        <a class="ref-card" href="https://www.emergentmind.com/topics/humanoid-whole-body-controllers" target="_blank">
+          <div class="ref-num">[37]</div><div><div class="ref-title">Humanoid Whole-Body Controllers</div><div class="ref-source">Emergent Mind, 2025</div><div class="ref-url">emergentmind.com/topics/humanoid-whole-body-controllers</div></div>
+        </a>
+        <a class="ref-card" href="https://github.com/roboterax/humanoid-gym" target="_blank">
+          <div class="ref-num">[38]</div><div><div class="ref-title">humanoid-gym — Open Source RL Training Pipeline</div><div class="ref-source">GitHub, 2024</div><div class="ref-url">github.com/roboterax/humanoid-gym</div></div>
+        </a>
+        <a class="ref-card" href="https://arxiv.org/abs/2404.05695" target="_blank">
+          <div class="ref-num">[39]</div><div><div class="ref-title">Reinforcement Learning for Humanoid Robot with Zero-Shot Sim-to-Real Transfer</div><div class="ref-source">arXiv, 2024</div><div class="ref-url">arxiv.org/abs/2404.05695</div></div>
+        </a>
+        <a class="ref-card" href="https://phys.org/news/2008-03-boston-dynamics-quadruped-rough-terrain.html" target="_blank">
+          <div class="ref-num">[41]</div><div><div class="ref-title">Boston Dynamics: Quadruped Rough Terrain Robot Prototype</div><div class="ref-source">Phys.org via Boston Dynamics, 2008</div><div class="ref-url">phys.org/news/2008-03-boston-dynamics-quadruped-rough-terrain.html</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">CAN Bus / EtherCAT <span class="refs-count">3</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://www.icpdas.com/root/product/solutions/industrial_communication/fieldbus/ethercat/ethercat_intro.html" target="_blank">
+          <div class="ref-num">[43]</div><div><div class="ref-title">EtherCAT — industrial communication</div><div class="ref-source">ICP DAS</div><div class="ref-url">icpdas.com/…/fieldbus/ethercat/ethercat_intro.html</div></div>
+        </a>
+        <a class="ref-card" href="https://www.ethercat.org/en/technology.html" target="_blank">
+          <div class="ref-num">[44]</div><div><div class="ref-title">EtherCAT — the Ethernet Fieldbus</div><div class="ref-source">EtherCAT Technology Group</div><div class="ref-url">ethercat.org/en/technology.html</div></div>
+        </a>
+        <a class="ref-card" href="https://www.honpine.com/news/Industry-News/Robot-Communication-Protocols--Why-EtherCAT-and-CAN-Are-the-Future.html" target="_blank">
+          <div class="ref-num">[45]</div><div><div class="ref-title">Robot Communication Protocols: Why EtherCAT and CAN Are the Future</div><div class="ref-source">Honpine, 2026</div><div class="ref-url">honpine.com/news/…/Robot-Communication-Protocols…</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">行為樹 <span class="refs-count">4</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://arxiv.org/pdf/2010.06256.pdf" target="_blank">
+          <div class="ref-num">[47]</div><div><div class="ref-title">Behavior Trees in Action: A Study of Robotics Applications</div><div class="ref-source">arXiv, 2020</div><div class="ref-url">arxiv.org/pdf/2010.06256.pdf</div></div>
+        </a>
+        <a class="ref-card" href="https://robohub.org/introduction-to-behavior-trees/" target="_blank">
+          <div class="ref-num">[48]</div><div><div class="ref-title">Introduction to behavior trees</div><div class="ref-source">Robohub, 2021</div><div class="ref-url">robohub.org/introduction-to-behavior-trees/</div></div>
+        </a>
+        <a class="ref-card" href="https://www.sciencedirect.com/science/article/pii/S0921889022000513" target="_blank">
+          <div class="ref-num">[49]</div><div><div class="ref-title">A survey of Behavior Trees in robotics and AI</div><div class="ref-source">ScienceDirect</div><div class="ref-url">sciencedirect.com/science/article/pii/S0921889022000513</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">歷史發展 — 機械臂與早期機器人 <span class="refs-count">10</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://en.wikipedia.org/wiki/Unimate" target="_blank">
+          <div class="ref-num">[50]</div><div><div class="ref-title">Unimate</div><div class="ref-source">Wikipedia</div><div class="ref-url">en.wikipedia.org/wiki/Unimate</div></div>
+        </a>
+        <a class="ref-card" href="https://www.automate.org/robotics/engelberger/joseph-engelberger-unimate" target="_blank">
+          <div class="ref-num">[53]</div><div><div class="ref-title">Joseph Engelberger and Unimate: Pioneering the Robotics Revolution</div><div class="ref-source">Automate.org, 2025</div><div class="ref-url">automate.org/robotics/engelberger/joseph-engelberger-unimate</div></div>
+        </a>
+        <a class="ref-card" href="https://www.allaboutlean.com/kuka-famulus/" target="_blank">
+          <div class="ref-num">[58]</div><div><div class="ref-title">KUKA FAMULUS Turns 50 — The First Modern Industrial Robot</div><div class="ref-source">AllAboutLean, 2025</div><div class="ref-url">allaboutlean.com/kuka-famulus/</div></div>
+        </a>
+        <a class="ref-card" href="https://en.wikipedia.org/wiki/SCARA" target="_blank">
+          <div class="ref-num">[62]</div><div><div class="ref-title">SCARA</div><div class="ref-source">Wikipedia</div><div class="ref-url">en.wikipedia.org/wiki/SCARA</div></div>
+        </a>
+        <a class="ref-card" href="https://www.humanoid.waseda.ac.jp/booklet/kato_2.html" target="_blank">
+          <div class="ref-num">[63]</div><div><div class="ref-title">WABOT — Humanoid History</div><div class="ref-source">Waseda University</div><div class="ref-url">humanoid.waseda.ac.jp/booklet/kato_2.html</div></div>
+        </a>
+        <a class="ref-card" href="https://en.wikipedia.org/wiki/Honda_P_series" target="_blank">
+          <div class="ref-num">[65]</div><div><div class="ref-title">Honda P series</div><div class="ref-source">Wikipedia</div><div class="ref-url">en.wikipedia.org/wiki/Honda_P_series</div></div>
+        </a>
+        <a class="ref-card" href="https://global.honda/en/ASIMO/history/" target="_blank">
+          <div class="ref-num">[67]</div><div><div class="ref-title">History of robotics development — Honda ASIMO</div><div class="ref-source">Honda Global, 2023</div><div class="ref-url">global.honda/en/ASIMO/history/</div></div>
+        </a>
+        <a class="ref-card" href="https://global.honda/en/newsroom/news/2000/c001120b-eng.html" target="_blank">
+          <div class="ref-num">[68]</div><div><div class="ref-title">Honda Debuts New Humanoid Robot "ASIMO"</div><div class="ref-source">Honda Global, 2000</div><div class="ref-url">global.honda/en/newsroom/news/2000/c001120b-eng.html</div></div>
+        </a>
+        <a class="ref-card" href="https://en.wikipedia.org/wiki/ASIMO" target="_blank">
+          <div class="ref-num">[69]</div><div><div class="ref-title">ASIMO</div><div class="ref-source">Wikipedia</div><div class="ref-url">en.wikipedia.org/wiki/ASIMO</div></div>
+        </a>
+        <a class="ref-card" href="https://robotsguide.com/robots/bigdog" target="_blank">
+          <div class="ref-num">[42]</div><div><div class="ref-title">BigDog</div><div class="ref-source">ROBOTS Guide, 2023</div><div class="ref-url">robotsguide.com/robots/bigdog</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">深度學習革命 <span class="refs-count">4</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://viso.ai/deep-learning/alexnet/" target="_blank">
+          <div class="ref-num">[76]</div><div><div class="ref-title">AlexNet: Revolutionizing Deep Learning in Image Classification</div><div class="ref-source">Viso.ai, 2024</div><div class="ref-url">viso.ai/deep-learning/alexnet/</div></div>
+        </a>
+        <a class="ref-card" href="https://proceedings.neurips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf" target="_blank">
+          <div class="ref-num">[78]</div><div><div class="ref-title">ImageNet Classification with Deep Convolutional Neural Networks</div><div class="ref-source">NeurIPS (原始論文)</div><div class="ref-url">proceedings.neurips.cc/paper/4824-imagenet-classification…</div></div>
+        </a>
+        <a class="ref-card" href="https://www.darpa.mil/node/2020" target="_blank">
+          <div class="ref-num">[79]</div><div><div class="ref-title">Debut of Atlas Robot</div><div class="ref-source">DARPA, 2013</div><div class="ref-url">darpa.mil/node/2020</div></div>
+        </a>
+        <a class="ref-card" href="https://drc.csail.mit.edu/challenge/" target="_blank">
+          <div class="ref-num">[81]</div><div><div class="ref-title">The DARPA Robotics Challenge</div><div class="ref-source">MIT CSAIL, 2014</div><div class="ref-url">drc.csail.mit.edu/challenge/</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">2020s 人形平台 <span class="refs-count">8</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://www.youtube.com/watch?v=765jK5e29Rc" target="_blank">
+          <div class="ref-num">[82]</div><div><div class="ref-title">Tesla AI Day 2022 — Optimus Robot & FSD Livestream</div><div class="ref-source">YouTube / Tesla, 2022</div><div class="ref-url">youtube.com/watch?v=765jK5e29Rc</div></div>
+        </a>
+        <a class="ref-card" href="https://www.youtube.com/watch?v=umTWrf4PFP4" target="_blank">
+          <div class="ref-num">[84]</div><div><div class="ref-title">Figure 01 Humanoid Working in a Warehouse</div><div class="ref-source">YouTube / Figure, 2024</div><div class="ref-url">youtube.com/watch?v=umTWrf4PFP4</div></div>
+        </a>
+        <a class="ref-card" href="https://www.bloomberg.com/news/articles/2024-03-04/amazon-warehouses-provide-glimpse-of-workplace-humanoid-robots" target="_blank">
+          <div class="ref-num">[85]</div><div><div class="ref-title">Humanoid Robots at Amazon Provide Glimpse of an Automated Workplace</div><div class="ref-source">Bloomberg, 2024</div><div class="ref-url">bloomberg.com/news/articles/2024-03-04/amazon-warehouses…</div></div>
+        </a>
+        <a class="ref-card" href="https://www.geekwire.com/2023/getting-to-know-digit-the-humanoid-robot-that-amazon-just-started-testing-for-warehouse-work/" target="_blank">
+          <div class="ref-num">[87]</div><div><div class="ref-title">Getting to know 'Digit,' the humanoid robot that Amazon just started testing</div><div class="ref-source">GeekWire, 2023</div><div class="ref-url">geekwire.com/2023/getting-to-know-digit…</div></div>
+        </a>
+        <a class="ref-card" href="https://www.agilityrobotics.com/content/agility-robotics-broadens-relationship-with-amazon" target="_blank">
+          <div class="ref-num">[88]</div><div><div class="ref-title">Agility Robotics Broadens Relationship with Amazon</div><div class="ref-source">Agility Robotics, 2026</div><div class="ref-url">agilityrobotics.com/content/agility-robotics-broadens-relationship-with-amazon</div></div>
+        </a>
+        <a class="ref-card" href="https://www.therobotreport.com/unitree-robotics-unveils-g1-humanoid-for-16k/" target="_blank">
+          <div class="ref-num">[89]</div><div><div class="ref-title">Unitree Robotics unveils G1 humanoid for $16K</div><div class="ref-source">The Robot Report, 2024</div><div class="ref-url">therobotreport.com/unitree-robotics-unveils-g1-humanoid-for-16k/</div></div>
+        </a>
+        <a class="ref-card" href="https://www.unitree.com/news/29" target="_blank">
+          <div class="ref-num">[90]</div><div><div class="ref-title">Unitree G1 Humanoid Agent | Price from $16K</div><div class="ref-source">Unitree, 2024</div><div class="ref-url">unitree.com/news/29</div></div>
+        </a>
+        <a class="ref-card" href="https://www.aboutamazon.com/news/operations/amazon-million-robots-ai-foundation-model" target="_blank">
+          <div class="ref-num">[103]</div><div><div class="ref-title">Amazon launches a new AI foundation model to power its robotic systems</div><div class="ref-source">Amazon, 2025</div><div class="ref-url">aboutamazon.com/news/operations/amazon-million-robots-ai-foundation-model</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-section">
+      <div class="refs-section-title">未來技術 — 人工肌肉・太空・生物混合 <span class="refs-count">6</span></div>
+      <div class="refs-grid">
+        <a class="ref-card" href="https://www.pnas.org/doi/10.1073/pnas.1815053116" target="_blank">
+          <div class="ref-num">[100]</div><div><div class="ref-title">Realizing the potential of dielectric elastomer artificial muscles</div><div class="ref-source">PNAS, 2019</div><div class="ref-url">pnas.org/doi/10.1073/pnas.1815053116</div></div>
+        </a>
+        <a class="ref-card" href="https://onlinelibrary.wiley.com/doi/full/10.1002/smm2.1203" target="_blank">
+          <div class="ref-num">[101]</div><div><div class="ref-title">Dielectric elastomer artificial muscle materials advancement and soft robotics applications</div><div class="ref-source">Wiley, 2023</div><div class="ref-url">onlinelibrary.wiley.com/doi/full/10.1002/smm2.1203</div></div>
+        </a>
+        <a class="ref-card" href="https://apollomapping.com/blog/out-of-this-world-nasas-valkyrie-the-humanoid-robot" target="_blank">
+          <div class="ref-num">[91]</div><div><div class="ref-title">Out of This World — NASA's Valkyrie, The Humanoid Robot</div><div class="ref-source">Apollo Mapping, 2023</div><div class="ref-url">apollomapping.com/blog/out-of-this-world-nasas-valkyrie…</div></div>
+        </a>
+        <a class="ref-card" href="https://www.nasa.gov/podcasts/houston-we-have-a-podcast/valkyrie/" target="_blank">
+          <div class="ref-num">[93]</div><div><div class="ref-title">Valkyrie</div><div class="ref-source">NASA, 2023</div><div class="ref-url">nasa.gov/podcasts/houston-we-have-a-podcast/valkyrie/</div></div>
+        </a>
+        <a class="ref-card" href="https://www.cnn.com/2020/01/13/us/living-robot-stem-cells-intl-hnk-scli-scn" target="_blank">
+          <div class="ref-num">[105]</div><div><div class="ref-title">Xenobots: First living robots created from stem cells</div><div class="ref-source">CNN, 2020</div><div class="ref-url">cnn.com/2020/01/13/us/living-robot-stem-cells-intl-hnk-scli-scn</div></div>
+        </a>
+        <a class="ref-card" href="https://wyss.harvard.edu/news/team-builds-first-living-robots-that-can-reproduce/" target="_blank">
+          <div class="ref-num">[109]</div><div><div class="ref-title">Team builds first living robots — that can reproduce</div><div class="ref-source">Wyss Institute / Harvard, 2021</div><div class="ref-url">wyss.harvard.edu/news/team-builds-first-living-robots-that-can-reproduce/</div></div>
+        </a>
+      </div>
+    </div>
+
+    <div class="refs-note">
+      <strong>📌 關於本資料庫</strong><br>
+      本網站共引用 109 筆參考資料，涵蓋學術論文（Nature、NeurIPS、ICCV、PNAS）、產業白皮書（NVIDIA、Tesla、Amazon）、台灣廠商資料（上銀、台達）及維基百科等來源。以上列出核心條目；完整引用清單請參閱《人形機器人深度研究報告》（內湖高中科技與工程領域，2026年3月）。<br><br>
+      <strong>使用說明：</strong>點擊任一卡片即可跳轉至原始來源頁面。部分學術論文可能需要機構授權方可閱讀全文。
+    </div>
+
+  </div>
+</div><!-- /pg-refs -->
+
+<!-- STATUS BAR -->
+<div id="statusbar">
+  <div class="sb-item"><div class="sb-dot"></div>系統就緒</div>
+  <div class="sb-item" id="sb-mode">👁 觀察模式</div>
+  <div class="sb-item" id="sb-time">--:--:--</div>
+  <div class="sb-item" id="sb-loc">📍 --</div>
+</div>
+
+<script>
+// page switching
+function switchPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.pg-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  const idx={'robot':0,'history':1,'civ':2,'apps':3,'future':4,'refs':5}[id];
+  document.querySelectorAll('.pg-btn')[idx]?.classList.add('active');
+  document.getElementById('sb-mode').textContent={robot:'👁 觀察模式',history:'📅 歷史模式',civ:'⚡ 交匯模式',apps:'🌐 應用模式',future:'🚀 未來模式',refs:'📎 資料模式'}[id];
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// era / timeline toggle
+function toggleEra(el){
+  const wasOpen=el.classList.contains('open');
+  document.querySelectorAll('.tl-era,.era').forEach(e=>e.classList.remove('open'));
+  if(!wasOpen) el.classList.add('open');
+}
+
+// culture banner toggle
+function toggleCultureBanner(){
+  document.getElementById('culture-banner').classList.toggle('open');
+}
+
+// civ sub-tab switch
+function setCivTab(id){
+  document.querySelectorAll('.civ-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.civ-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('civp-'+id).classList.add('active');
+  const tabIdx={mech:0,energy:1,computer:2,ai:3}[id];
+  document.querySelectorAll('.civ-tab')[tabIdx]?.classList.add('active');
+}
+
+// ── APPS PAGE DATA & RENDER ────────────────────────────────
+const APPS = [
+  {
+    rank:'NO.01', icon:'🏭', color:'#ff6b35',
+    title:'智慧製造與產線自動化',
+    en:'Smart Manufacturing',
+    maturity:92,
+    desc:'最成熟的應用領域。機器人執行焊接、組裝、搬運、品檢，7×24 不間斷運作。Tesla、富士康、台積電均大規模部署協作機器人（Cobot）與 AMR 自主搬運車。2024 年 Tesla Optimus 開始在 Fremont 廠執行電池模組組裝。',
+    tags:['焊接', '組裝', '品質檢測', 'AMR 搬運', '協作機器人'],
+    companies:['Tesla Optimus', 'FANUC', 'ABB', 'Boston Dynamics Spot', '上銀科技', '台達電', '廣明光電'],
+  },
+  {
+    rank:'NO.02', icon:'🚗', color:'#00d4ff',
+    title:'自動駕駛與物流配送',
+    en:'Autonomous Vehicles & Delivery',
+    maturity:80,
+    desc:'機器人感知與導航技術的最大商業化出口。Waymo 在舊金山全面商業運營，Amazon Scout 配送機器人每日配送數萬件包裹，Agility Digit 在亞馬遜倉庫處理貨架補貨，台灣 iRobot 與物流業者也在試點。',
+    tags:['自動駕駛', '最後一哩配送', '倉儲揀貨', 'SLAM 導航'],
+    companies:['Waymo', 'Amazon Robotics', 'Agility Digit', 'Figure 01', 'Nuro', '台灣車王電子'],
+  },
+  {
+    rank:'NO.03', icon:'🏥', color:'#00f080',
+    title:'外科手術與醫療輔助',
+    en:'Surgical & Medical Robotics',
+    maturity:78,
+    desc:'達文西手術系統已完成逾 1,000 萬台手術，微創精準度遠超人手。台大、長庚、榮總均已引進。新一代 Hugo（Medtronic）、Versius（CMR）進入商業推廣，AI 即時影像引導讓腫瘤切除邊界誤差壓縮至 0.5mm。',
+    tags:['微創手術', '骨科機器人', '放射治療定位', '遠端手術'],
+    companies:['Intuitive Surgical（達文西）', 'Medtronic Hugo', 'Stryker Mako', 'CMR Versius', '台大醫院'],
+  },
+  {
+    rank:'NO.04', icon:'🛒', color:'#ffd060',
+    title:'零售服務與顧客互動',
+    en:'Retail & Customer Service',
+    maturity:60,
+    desc:'服務機器人在零售、餐廳、機場、飯店快速擴張。日本全家引進 Telexistence 補貨機器人，科技旅館大廳由 Pepper 接待，台北多家餐廳已有送餐機器人。LLM 賦予機器人自然對話能力，顧客互動品質大幅提升。',
+    tags:['接待', '送餐', '貨架補貨', '導覽', 'LLM 對話'],
+    companies:['SoftBank Pepper', 'Telexistence', 'Bear Robotics Servi', '擎天機器人', '鈦虎機器人'],
+  },
+  {
+    rank:'NO.05', icon:'👴', color:'#b060ff',
+    title:'長照與居家照護',
+    en:'Elder Care & Home Assistance',
+    maturity:45,
+    desc:'全球人口高齡化加速需求。日本 RIKEN 的 ROBEAR 可協助翻身、移位，豐田 HSR 輔助拾物，台灣工研院長照機器人試點於多所護理之家。搭配 LLM 的情感陪伴機器人減輕孤獨感，降低認知退化速度（初步臨床數據支持）。',
+    tags:['翻身移位', '用藥提醒', '跌倒偵測', '情感陪伴', '認知訓練'],
+    companies:['RIKEN ROBEAR', 'Toyota HSR', 'Intuition Robotics ElliQ', '工研院', '奇美醫院'],
+  },
+  {
+    rank:'NO.06', icon:'🔬', color:'#ff5588',
+    title:'實驗室自動化與生醫研究',
+    en:'Lab Automation & Biomedical',
+    maturity:72,
+    desc:'新冠疫情加速實驗室機器人普及。Opentrons OT-2 液體處理機器人進入全球高中、大學實驗室，自動化 PCR、DNA 萃取、藥物篩選。台灣中研院與工研院均設有機器人輔助實驗平台，縮短藥物研發週期 40%。',
+    tags:['液體處理', 'PCR 自動化', '藥物篩選', '細胞培養', 'DNA 萃取'],
+    companies:['Opentrons', 'Hamilton Robotics', 'Beckman Coulter', 'Thermo Fisher', '中研院', '國衛院'],
+  },
+  {
+    rank:'NO.07', icon:'🏗️', color:'#ff8c42',
+    title:'建築、橋樑與基礎設施檢測',
+    en:'Construction & Infrastructure',
+    maturity:55,
+    desc:'Boston Dynamics Spot 搭載熱感相機、超音波探頭，巡邏橋樑、管線、核電廠，取代人工爬上危險結構物。SAM100 砌磚機器人每日可砌 3,000 塊磚，是人工的 6 倍速。台灣中油、台電已引進 Spot 進行設備巡檢試驗。',
+    tags:['結構健康監測', '管線檢測', '自動砌磚', '爆破拆除', '橋樑巡檢'],
+    companies:['Boston Dynamics Spot', 'SAM100', 'Hilti Jaibot', '台電', '中油', '高公局'],
+  },
+  {
+    rank:'NO.08', icon:'🌾', color:'#00f080',
+    title:'農業採收與精準農業',
+    en:'Agriculture & Precision Farming',
+    maturity:52,
+    desc:'農業缺工問題在台灣尤其嚴峻。Agrobot 草莓採收機器人識別熟度後精準剪枝，Iron Ox 全自動水耕農場整合機器人耕作。台灣農委會與中興大學正試驗無人機 + 地面機器人協同的精準農業系統，減少農藥用量 35%。',
+    tags:['採收機器人', '無人機噴藥', '土壤感測', '水耕管理', '精準施肥'],
+    companies:['Agrobot', 'Iron Ox', 'Harvest CROO', 'John Deere', '台灣農業科技', '中興大學'],
+  },
+  {
+    rank:'NO.09', icon:'🚒', color:'#00d4ff',
+    title:'災難搜救與危險環境作業',
+    en:'Disaster Response & Hazardous Ops',
+    maturity:48,
+    desc:'2011 年福島核災後，遙控機器人進入爐心的需求大增。現在 Boston Dynamics Atlas、ANYmal、Ghost Robotics 的四足機器人可在碎石堆中搜尋生還者，攜帶熱感相機與瓦斯偵測器。台灣消防署正評估引進搜救機器人試驗計畫。',
+    tags:['廢墟搜救', '核污染場域', '深海探測', '礦坑巡邏', '火場偵察'],
+    companies:['Boston Dynamics Atlas', 'ANYbotics ANYmal', 'Ghost Robotics', 'Sarcos', '日本NEDO'],
+  },
+  {
+    rank:'NO.10', icon:'🎓', color:'#ffd060',
+    title:'教育、研究與人機互動',
+    en:'Education, Research & HRI',
+    maturity:65,
+    desc:'NAO、Pepper 機器人進入全球數千所學校，教程式設計、AI 概念、STEM 思維。MIT CSAIL 的社交機器人研究改寫人機互動理論，台灣師大、交大、台科大均有機器人教育研究室。Unitree G1 的開源生態讓台灣學生也能做人形機器人研究。',
+    tags:['程式教育', 'STEM 教學', '社交機器人', '人機互動研究', '開源平台'],
+    companies:['SoftBank NAO/Pepper', 'Unitree G1（開源）', 'MIT CSAIL', '台師大', '交大', '台科大'],
+  },
+];
+
+function renderApps(){
+  const grid = document.getElementById('apps-grid');
+  if(!grid) return;
+  grid.innerHTML = APPS.map(a=>`
+    <div class="app-card" style="--ac:${a.color}">
+      <div class="app-card-top"></div>
+      <div class="app-card-body">
+        <div class="app-rank">${a.rank}</div>
+        <div class="app-icon-title">
+          <div class="app-icon-wrap">${a.icon}</div>
+          <div>
+            <div class="app-title">${a.title}</div>
+            <div class="app-en">${a.en.toUpperCase()}</div>
+          </div>
+        </div>
+        <div class="app-desc">${a.desc}</div>
+        <div class="app-maturity">
+          <span class="app-maturity-label">成熟度</span>
+          <div class="app-bar-track"><div class="app-bar-fill" data-pct="${a.maturity}"></div></div>
+          <span class="app-pct">${a.maturity}%</span>
+        </div>
+        <div class="app-tags">${a.tags.map(t=>`<span class="app-tag">${t}</span>`).join('')}</div>
+        <div class="app-companies">${a.companies.map(c=>`<span class="app-company">${c}</span>`).join('')}</div>
+      </div>
+    </div>
+  `).join('');
+  // animate bars when they enter viewport
+  const io = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(en.isIntersecting){
+        const fill = en.target;
+        fill.style.width = fill.dataset.pct + '%';
+        io.unobserve(fill);
+      }
+    });
+  },{threshold:0.2});
+  document.querySelectorAll('.app-bar-fill').forEach(el=>io.observe(el));
+}
+// run on load + when switching to apps page
+renderApps();
+
+// era image loader with fallback chains
+const ERA_IMGS = {
+  'era-img-1': [
+    'https://upload.wikimedia.org/wikipedia/commons/2/2e/Unimate.jpg',
+    'https://robotsguide.com/sites/default/files/robots/unimate-robot.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Unimate_at_work.jpg/640px-Unimate_at_work.jpg'
+  ],
+  'era-img-2': [
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/HONDA_ASIMO.jpg/480px-HONDA_ASIMO.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/7/7c/ASIMO_4.28.11.jpg',
+    'https://cdn.britannica.com/67/174267-050-04275E91/ASIMO-Honda-robot.jpg'
+  ],
+  'era-img-3': [
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/BigDog_quadruped_robot.jpg/640px-BigDog_quadruped_robot.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/1/15/BigDog_photo.jpg',
+    'https://cdn.vox-cdn.com/thumbor/BigDog.jpg'
+  ],
+  'era-img-4': [
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Atlas_from_boston_dynamics.jpg/640px-Atlas_from_boston_dynamics.jpg',
+    'https://upload.wikimedia.org/wikipedia/commons/5/58/Boston_dynamics_atlas.jpg',
+    'https://cdn.vox-cdn.com/thumbor/atlas-parkour.jpg'
+  ],
+  'era-img-5': [
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/Tesla_Optimus_Robot.jpg/640px-Tesla_Optimus_Robot.jpg',
+    'https://cdn.arstechnica.net/wp-content/uploads/2022/10/tesla-optimus.jpg',
+    'https://electrek.co/wp-content/uploads/sites/3/2022/10/Tesla-Optimus-robot.jpg'
+  ]
+};
+function loadImgWithFallback(id, urls, idx){
+  if(idx>=urls.length){
+    const el=document.getElementById(id);
+    if(el) el.style.display='none';
+    return;
+  }
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.onerror=()=>loadImgWithFallback(id,urls,idx+1);
+  el.src=urls[idx];
+}
+// init all era images (hidden until era opened)
+Object.keys(ERA_IMGS).forEach(id=>loadImgWithFallback(id,ERA_IMGS[id],0));
+
+// cursor
+const cur=document.getElementById('cur');
+document.addEventListener('mousemove',e=>{
+  cur.style.left=e.clientX+'px';cur.style.top=e.clientY+'px';
+  moveEyes(e.clientX,e.clientY);
+});
+
+// eyes
+const pL=document.getElementById('pL'),pR=document.getElementById('pR');
+const pLs=document.getElementById('pLs'),pRs=document.getElementById('pRs');
+function moveEyes(ex,ey){
+  const s=document.getElementById('R').getBoundingClientRect();
+  if(!s.width)return;
+  const sx=(ex-s.left)*(280/s.width),sy=(ey-s.top)*(510/s.height);
+  [{e:pL,d:pLs,cx:110,cy:62},{e:pR,d:pRs,cx:168,cy:62}].forEach(({e,d,cx,cy})=>{
+    const dx=sx-cx,dy=sy-cy,dist=Math.sqrt(dx*dx+dy*dy);
+    const r=Math.min(dist,6)/Math.max(dist,.001);
+    const nx=cx+dx*r,ny=cy+dy*r;
+    e.setAttribute('cx',nx);e.setAttribute('cy',ny);
+    d.setAttribute('cx',nx+1.5);d.setAttribute('cy',ny-1.5);
+  });
+}
+
+// explode
+let isExploded=false;
+function toggleExplode(){
+  isExploded=!isExploded;
+  const rw=document.getElementById('rw');
+  const btn=document.getElementById('explode-btn');
+  rw.classList.toggle('exploded',isExploded);
+  btn.textContent=isExploded?'⬡ 還原組合':'⬡ 分解視圖';
+  btn.style.borderColor=isExploded?'var(--warm)':'var(--c1)';
+  btn.style.color=isExploded?'var(--warm)':'var(--c1)';
+  document.getElementById('sb-mode').textContent=isExploded?'🔧 分解模式':'👁 觀察模式';
+  showBubble(isExploded?'部件分解中… 點擊各系統探索':'系統重新整合完成');
+}
+
+// select part
+let active=null;
+const CARDS={head:'card-head',chest:'card-chest',arms:'card-arms',legs:'card-legs',sys:'card-sys'};
+const GROUPS={head:['p-head'],chest:['p-chest'],arms:['p-arm-l','p-arm-r'],legs:['p-legs'],sys:['p-head','p-chest','p-arm-l','p-arm-r','p-legs']};
+const MSG={head:'視覺感知系統啟動…',chest:'核心能源模組分析…',arms:'手臂關節系統掃描…',legs:'移動控制系統載入…',sys:'系統整合架構可視化中…'};
+const ALL_PARTS=['p-head','p-chest','p-arm-l','p-arm-r','p-legs'];
+
+function sel(part,e){
+  if(e)e.stopPropagation();
+  // ripple
+  if(e){const r=document.createElement('div');r.className='rip';r.style.left=e.clientX+'px';r.style.top=e.clientY+'px';document.body.appendChild(r);setTimeout(()=>r.remove(),700)}
+  // deactivate old
+  if(active){
+    document.getElementById(CARDS[active])?.classList.remove('active');
+    document.querySelectorAll('.detail-panel').forEach(p=>p.classList.remove('active'));
+    ALL_PARTS.forEach(id=>document.getElementById(id)?.classList.remove('dimmed','lit'));
+    const sysOverlay=document.getElementById('p-sys');
+    if(sysOverlay) sysOverlay.style.opacity='0';
+  }
+  if(active===part){active=null;document.getElementById('detail-placeholder').style.display='flex';return}
+  active=part;
+  // activate card
+  document.getElementById(CARDS[part])?.classList.add('active');
+  // highlight parts
+  ALL_PARTS.forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    el.classList.toggle('lit',GROUPS[part].includes(id));
+    el.classList.toggle('dimmed',!GROUPS[part].includes(id));
+  });
+  // sys overlay
+  const sysOverlay=document.getElementById('p-sys');
+  if(sysOverlay) sysOverlay.style.opacity = part==='sys' ? '1' : '0';
+  // show detail
+  document.getElementById('detail-placeholder').style.display='none';
+  document.getElementById('dp-'+part)?.classList.add('active');
+  // scroll to detail
+  setTimeout(()=>document.getElementById('detail-zone').scrollIntoView({behavior:'smooth',block:'start'}),50);
+  showBubble(MSG[part]);
+  document.getElementById('sb-mode').textContent='🔍 '+{head:'頭部感測',chest:'胸部核心',arms:'手臂關節',legs:'移動系統',sys:'系統整合'}[part];
+}
+
+// bubble
+const bubble=document.getElementById('bubble');
+let bt;
+function showBubble(txt){
+  bubble.textContent=txt;bubble.classList.add('on');
+  clearTimeout(bt);bt=setTimeout(()=>bubble.classList.remove('on'),3200);
+}
+
+// canvas bg
+const cv=document.getElementById('bg');const c=cv.getContext('2d');
+function resize(){cv.width=innerWidth;cv.height=innerHeight}resize();
+window.addEventListener('resize',resize);
+const NS=[];
+function buildNS(){NS.length=0;for(let i=0;i<55;i++)NS.push({x:Math.random()*cv.width,y:Math.random()*cv.height,vx:(Math.random()-.5)*.13,vy:(Math.random()-.5)*.13,p:Math.random()*Math.PI*2,s:Math.random()*1.4+.4,col:Math.random()>.8?'#ff8c42':'#00d4ff'})}
+buildNS();window.addEventListener('resize',buildNS);
+function drawBg(){
+  c.clearRect(0,0,cv.width,cv.height);
+  NS.forEach(n=>{n.x+=n.vx;n.y+=n.vy;n.p+=.007;
+    if(n.x<0||n.x>cv.width)n.vx*=-1;if(n.y<0||n.y>cv.height)n.vy*=-1});
+  for(let i=0;i<NS.length;i++)for(let j=i+1;j<NS.length;j++){
+    const a=NS[i],b=NS[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<135){const al=(1-d/135)*.08*(Math.sin(a.p)*.5+.5);
+      const mx=a.x+dx*.5;
+      c.beginPath();c.moveTo(a.x,a.y);c.lineTo(mx,a.y);c.lineTo(mx,b.y);c.lineTo(b.x,b.y);
+      c.strokeStyle=`rgba(0,160,200,${al})`;c.lineWidth=.5;c.stroke();}
+  }
+  NS.forEach(n=>{const a=(Math.sin(n.p)*.5+.5)*.35+.06;
+    c.beginPath();c.arc(n.x,n.y,n.s,0,Math.PI*2);
+    c.fillStyle=n.col==='#ff8c42'?`rgba(255,140,66,${a})`:`rgba(0,212,255,${a})`;
+    c.shadowBlur=6;c.shadowColor=n.col;c.fill();c.shadowBlur=0;});
+}
+
+// clock
+function tick(){document.getElementById('sb-time').textContent=new Date().toTimeString().slice(0,8)}
+tick();setInterval(tick,1000);
+
+// weather
+async function loadWeather(lat,lon){
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode&temperature_unit=celsius&timezone=auto`);
+    const d=await r.json();
+    const temp=Math.round(d.current.temperature_2m);
+    const code=d.current.weathercode;
+    let icon='☀️',desc='晴天';
+    if(code===0){icon='☀️';desc='晴天'}else if(code<=2){icon='🌤️';desc='部分多雲'}else if(code===3){icon='☁️';desc='陰天'}else if(code<=49){icon='🌫️';desc='霧'}else if(code<=59){icon='🌦️';desc='毛毛雨'}else if(code<=69){icon='🌧️';desc='下雨'}else if(code<=79){icon='❄️';desc='下雪'}else{icon='⛈️';desc='雷雨'}
+    const col=temp<=15?'#42d4ff':temp<=25?'#ddeeff':temp<=32?'#ffab00':'#ff5500';
+    document.getElementById('wx-nav-icon').textContent=icon;
+    document.getElementById('wx-nav-temp').textContent=temp+'°C';
+    document.getElementById('wx-nav-temp').style.color=col;
+    document.getElementById('wx-nav-temp').style.textShadow=`0 0 12px ${col}88`;
+    document.getElementById('wx-nav-desc').textContent=desc;
+    try{
+      const g=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`,{headers:{'Accept-Language':'zh-TW'}});
+      const gd=await g.json();
+      const city=gd.address.city||gd.address.town||gd.address.village||gd.address.county||'';
+      document.getElementById('wx-nav-city').textContent=city;
+      document.getElementById('sb-loc').textContent='📍 '+city+' '+temp+'°C';
+    }catch{document.getElementById('sb-loc').textContent='📍 '+temp+'°C';}
+  }catch{document.getElementById('wx-nav-temp').textContent='--°C';}
+}
+if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>loadWeather(p.coords.latitude,p.coords.longitude),()=>loadWeather(25.0330,121.5654));
+else loadWeather(25.0330,121.5654);
+
+// robot idle bob
+let t=0;
+function loop(){
+  t+=.012;
+  const bob=Math.sin(t)*7;
+  document.getElementById('rw').style.transform=`translateY(${bob}px)`;
+  drawBg();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// greet
+setTimeout(()=>showBubble('點擊我的部件，探索機器人科技！'),1400);
+</script>
+</body>
+</html>
